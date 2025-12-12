@@ -1,0 +1,313 @@
+/**
+ * Database types generated from Supabase schema
+ * These types match the database/schema.sql structure
+ */
+
+// Enum types matching PostgreSQL ENUMs
+export type MemberRole = 'owner' | 'admin' | 'member';
+export type GroupStatus = 'active' | 'archived' | 'deleted';
+export type AwardStatus = 'draft' | 'nominations' | 'voting' | 'completed' | 'archived';
+export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
+export type NotificationType = 
+  | 'group_invite'
+  | 'award_created'
+  | 'nomination_received'
+  | 'voting_started'
+  | 'award_won'
+  | 'new_member'
+  | 'role_changed';
+
+// JSON types for settings
+export interface ProfileSettings {
+  notifications: boolean;
+  theme: 'auto' | 'light' | 'dark';
+}
+
+export interface GroupSettings {
+  allow_member_nominations: boolean;
+  allow_member_voting: boolean;
+  max_members: number;
+  require_approval: boolean;
+}
+
+export interface VotingSettings {
+  allow_self_vote: boolean;
+  max_votes_per_user: number;
+  anonymous_voting: boolean;
+  show_results_before_end: boolean;
+}
+
+// Table row types
+export interface Profile {
+  id: string;
+  username: string | null;
+  display_name: string;
+  avatar_url: string | null;
+  bio: string | null;
+  email: string | null;
+  settings: ProfileSettings;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string | null;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  cover_image_url: string | null;
+  status: GroupStatus;
+  is_public: boolean;
+  invite_code: string;
+  invite_code_expires_at: string | null;
+  settings: GroupSettings;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: MemberRole;
+  is_active: boolean;
+  invited_by: string | null;
+  joined_at: string;
+  updated_at: string;
+}
+
+export interface GroupInvitation {
+  id: string;
+  group_id: string;
+  invited_by: string;
+  invited_user_id: string | null;
+  invite_email: string | null;
+  invite_code: string;
+  status: InvitationStatus;
+  created_at: string;
+  expires_at: string | null;
+  responded_at: string | null;
+}
+
+export interface AwardCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  is_global: boolean;
+  group_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface Award {
+  id: string;
+  group_id: string;
+  category_id: string | null;
+  name: string;
+  description: string | null;
+  icon: string;
+  status: AwardStatus;
+  voting_settings: VotingSettings;
+  nominations_start_at: string | null;
+  nominations_end_at: string | null;
+  voting_start_at: string | null;
+  voting_end_at: string | null;
+  winner_id: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface Nominee {
+  id: string;
+  award_id: string;
+  user_id: string;
+  nominated_by: string | null;
+  nomination_reason: string | null;
+  vote_count: number;
+  is_winner: boolean;
+  created_at: string;
+}
+
+export interface Vote {
+  id: string;
+  award_id: string;
+  voter_id: string;
+  nominee_id: string;
+  points: number;
+  created_at: string;
+}
+
+export interface Ceremony {
+  id: string;
+  group_id: string;
+  name: string;
+  description: string | null;
+  cover_image_url: string | null;
+  scheduled_at: string | null;
+  is_live: boolean;
+  is_completed: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
+  data: Record<string, unknown>;
+  group_id: string | null;
+  award_id: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+// View types
+export interface GroupMemberView extends GroupMember {
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+}
+
+export interface AwardWithStats extends Award {
+  group_name: string;
+  nominee_count: number;
+  total_votes: number;
+}
+
+// Extended types with relations (for frontend use)
+export interface GroupWithMembers extends Group {
+  members: GroupMemberView[];
+  member_count: number;
+}
+
+export interface GroupWithDetails extends GroupWithMembers {
+  awards: Award[];
+  my_role: MemberRole | null;
+}
+
+export interface AwardWithNominees extends Award {
+  nominees: NomineeWithProfile[];
+  group?: Group;
+}
+
+export interface NomineeWithProfile extends Nominee {
+  user: Profile;
+}
+
+// Input types for creating/updating
+export interface CreateGroupInput {
+  name: string;
+  description?: string;
+  icon?: string;
+}
+
+export interface UpdateGroupInput {
+  name?: string;
+  description?: string | null;
+  icon?: string;
+  settings?: Partial<GroupSettings>;
+}
+
+export interface CreateAwardInput {
+  group_id: string;
+  name: string;
+  description?: string;
+  icon?: string;
+  category_id?: string;
+  nominee_ids: string[];
+}
+
+export interface UpdateAwardInput {
+  name?: string;
+  description?: string | null;
+  icon?: string;
+  status?: AwardStatus;
+}
+
+// Database schema type for Supabase client
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: Profile;
+        Insert: Omit<Profile, 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Profile, 'id' | 'created_at'>>;
+      };
+      groups: {
+        Row: Group;
+        Insert: Omit<Group, 'id' | 'invite_code' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Group, 'id' | 'created_at'>>;
+      };
+      group_members: {
+        Row: GroupMember;
+        Insert: Omit<GroupMember, 'id' | 'joined_at' | 'updated_at'>;
+        Update: Partial<Omit<GroupMember, 'id' | 'joined_at'>>;
+      };
+      group_invitations: {
+        Row: GroupInvitation;
+        Insert: Omit<GroupInvitation, 'id' | 'invite_code' | 'created_at'>;
+        Update: Partial<Omit<GroupInvitation, 'id' | 'invite_code' | 'created_at'>>;
+      };
+      award_categories: {
+        Row: AwardCategory;
+        Insert: Omit<AwardCategory, 'id' | 'created_at'>;
+        Update: Partial<Omit<AwardCategory, 'id' | 'created_at'>>;
+      };
+      awards: {
+        Row: Award;
+        Insert: Omit<Award, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Award, 'id' | 'created_at'>>;
+      };
+      nominees: {
+        Row: Nominee;
+        Insert: Omit<Nominee, 'id' | 'vote_count' | 'is_winner' | 'created_at'>;
+        Update: Partial<Omit<Nominee, 'id' | 'created_at'>>;
+      };
+      votes: {
+        Row: Vote;
+        Insert: Omit<Vote, 'id' | 'created_at'>;
+        Update: never; // Votes shouldn't be updated
+      };
+      ceremonies: {
+        Row: Ceremony;
+        Insert: Omit<Ceremony, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Ceremony, 'id' | 'created_at'>>;
+      };
+      notifications: {
+        Row: Notification;
+        Insert: Omit<Notification, 'id' | 'created_at'>;
+        Update: Partial<Omit<Notification, 'id' | 'created_at'>>;
+      };
+    };
+    Views: {
+      group_members_view: {
+        Row: GroupMemberView;
+      };
+      awards_with_stats: {
+        Row: AwardWithStats;
+      };
+    };
+    Functions: {
+      generate_invite_code: {
+        Args: { length?: number };
+        Returns: string;
+      };
+    };
+    Enums: {
+      member_role: MemberRole;
+      group_status: GroupStatus;
+      award_status: AwardStatus;
+      invitation_status: InvitationStatus;
+      notification_type: NotificationType;
+    };
+  };
+}

@@ -1,23 +1,24 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
-import { Colors } from "../../constants/Colors";
-import { theme } from "../../constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button } from "../../../../components/ui/Button";
+import { Input } from "../../../../components/ui/Input";
+import { Colors } from "../../../../constants/Colors";
+import { theme } from "../../../../constants/theme";
 
 const groupIcons = ["🏆", "🎉", "⭐", "🎄", "🎯", "🔥", "💎", "🎭"];
 
 export default function CreateGroupScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIcon, setSelectedIcon] = useState("🏆");
@@ -34,7 +35,7 @@ export default function CreateGroupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -96,7 +97,7 @@ export default function CreateGroupScreen() {
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
           <Button
             title="Crear Grupo"
             onPress={handleCreate}
@@ -105,7 +106,7 @@ export default function CreateGroupScreen() {
           />
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

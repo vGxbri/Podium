@@ -2,28 +2,29 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { MemberAvatar } from "../../components/MemberAvatar";
-import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
-import { Input } from "../../components/ui/Input";
-import { Colors } from "../../constants/Colors";
-import { theme } from "../../constants/theme";
-import { getGroupById } from "../../data/mockData";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { MemberAvatar } from "../../../../components/MemberAvatar";
+import { Button } from "../../../../components/ui/Button";
+import { Card } from "../../../../components/ui/Card";
+import { Input } from "../../../../components/ui/Input";
+import { Colors } from "../../../../constants/Colors";
+import { theme } from "../../../../constants/theme";
+import { getGroupById } from "../../../../data/mockData";
 
 const awardIcons = ["🏆", "🌟", "🎖️", "🥇", "👑", "💎", "🏅", "⭐"];
 
 export default function CreateAwardScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   
   const group = getGroupById(groupId || "");
   
@@ -35,12 +36,12 @@ export default function CreateAwardScreen() {
 
   if (!group) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Grupo no encontrado</Text>
           <Button title="Volver" onPress={() => router.back()} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -63,7 +64,7 @@ export default function CreateAwardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -156,7 +157,7 @@ export default function CreateAwardScreen() {
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
           <Button
             title="Crear Premio"
             onPress={handleCreate}
@@ -165,7 +166,7 @@ export default function CreateAwardScreen() {
           />
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }
 

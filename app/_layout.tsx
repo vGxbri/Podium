@@ -1,47 +1,32 @@
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Colors } from "../constants/Colors";
+import { AuthProvider } from "../hooks/useAuth";
 
 export default function RootLayout() {
   return (
-    <>
-      <StatusBar style="dark" />
-      <Stack
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: Colors.background,
-          },
-          headerTintColor: Colors.primary,
-          headerTitleStyle: {
-            fontWeight: "600",
-          },
-          contentStyle: {
-            backgroundColor: Colors.background,
-          },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="group/create"
-          options={{
-            title: "Crear Grupo",
-            presentation: "modal",
+    <AuthProvider>
+      <SafeAreaProvider>
+        <StatusBar style="dark" />
+        <Stack
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: Colors.background,
+            },
+            headerTintColor: Colors.primary,
+            headerTitleStyle: {
+              fontWeight: "600",
+            },
+            contentStyle: {
+              backgroundColor: Colors.background,
+            },
           }}
-        />
-        <Stack.Screen
-          name="group/[id]"
-          options={{
-            title: "Grupo",
-          }}
-        />
-        <Stack.Screen
-          name="award/create"
-          options={{
-            title: "Crear Premio",
-            presentation: "modal",
-          }}
-        />
-      </Stack>
-    </>
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }
+

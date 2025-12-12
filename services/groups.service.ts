@@ -1,0 +1,330 @@
+import { supabase } from '../lib/supabase';
+import {
+  CreateGroupInput,
+  Group,
+  GroupMemberView,
+  GroupWithDetails,
+  MemberRole,
+  UpdateGroupInput,
+} from '../types/database';
+
+export const groupsService = {
+  /**
+   * Get all groups the current user belongs to
+   */
+  async getMyGroups(): Promise<GroupWithDetails[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get groups with member info
+    const { data: memberships, error: memberError } = await supabase
+      .from('group_members')
+      .select(`
+        role,
+        group:groups (
+          *
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true);
+
+    if (memberError) throw memberError;
+
+    // Get member counts and details for each group
+    const groupsWithDetails = await Promise.all(
+      (memberships || []).map(async (membership) => {
+        const group = membership.group as unknown as Group;
+        
+        // Get members
+        const { data: members, error: membersError } = await supabase
+          .from('group_members_view')
+          .select('*')
+          .eq('group_id', group.id);
+
+        if (membersError) throw membersError;
+
+        // Get awards
+        const { data: awards, error: awardsError } = await supabase
+          .from('awards')
+          .select('*')
+          .eq('group_id', group.id)
+          .neq('status', 'archived');
+
+        if (awardsError) throw awardsError;
+
+        return {
+          ...group,
+          members: members || [],
+          member_count: members?.length || 0,
+          awards: awards || [],
+          my_role: membership.role as MemberRole,
+        };
+      })
+    );
+
+    return groupsWithDetails;
+  },
+
+  /**
+   * Get a group by ID with full details
+   */
+  async getGroupById(groupId: string): Promise<GroupWithDetails | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get the group
+    const { data: group, error: groupError } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('id', groupId)
+      .single();
+
+    if (groupError) {
+      if (groupError.code === 'PGRST116') return null; // Not found
+      throw groupError;
+    }
+
+    // Get membership info
+    const { data: membership } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single();
+
+    // Get members
+    const { data: members, error: membersError } = await supabase
+      .from('group_members_view')
+      .select('*')
+      .eq('group_id', groupId);
+
+    if (membersError) throw membersError;
+
+    // Get awards
+    const { data: awards, error: awardsError } = await supabase
+      .from('awards')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false });
+
+    if (awardsError) throw awardsError;
+
+    return {
+      ...group,
+      members: members || [],
+      member_count: members?.length || 0,
+      awards: awards || [],
+      my_role: membership?.role as MemberRole || null,
+    };
+  },
+
+  /**
+   * Create a new group
+   */
+  async createGroup(input: CreateGroupInput): Promise<Group> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const { data, error } = await supabase
+      .from('groups')
+      .insert({
+        name: input.name,
+        description: input.description || null,
+        icon: input.icon || '🏆',
+        created_by: user.id,
+        status: 'active',
+        is_public: false,
+        settings: {
+          allow_member_nominations: false,
+          allow_member_voting: true,
+          max_members: 100,
+          require_approval: false,
+        },
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Update a group
+   */
+  async updateGroup(groupId: string, input: UpdateGroupInput): Promise<Group> {
+    const { data, error } = await supabase
+      .from('groups')
+      .update(input)
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Delete a group (soft delete by changing status)
+   */
+  async deleteGroup(groupId: string): Promise<void> {
+    const { error } = await supabase
+      .from('groups')
+      .update({ status: 'deleted' })
+      .eq('id', groupId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Get a group by invite code
+   */
+  async getGroupByInviteCode(inviteCode: string): Promise<Group | null> {
+    const { data, error } = await supabase
+      .from('groups')
+      .select('*')
+      .eq('invite_code', inviteCode.toUpperCase())
+      .eq('status', 'active')
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null; // Not found
+      throw error;
+    }
+    return data;
+  },
+
+  /**
+   * Join a group using invite code
+   */
+  async joinGroup(inviteCode: string): Promise<Group> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get the group
+    const group = await this.getGroupByInviteCode(inviteCode);
+    if (!group) throw new Error('Invalid invite code');
+
+    // Check if already a member
+    const { data: existing } = await supabase
+      .from('group_members')
+      .select('id, is_active')
+      .eq('group_id', group.id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (existing) {
+      if (existing.is_active) {
+        throw new Error('You are already a member of this group');
+      }
+      // Reactivate membership
+      await supabase
+        .from('group_members')
+        .update({ is_active: true })
+        .eq('id', existing.id);
+    } else {
+      // Create new membership
+      const { error } = await supabase
+        .from('group_members')
+        .insert({
+          group_id: group.id,
+          user_id: user.id,
+          role: 'member',
+          is_active: true,
+        });
+
+      if (error) throw error;
+    }
+
+    return group;
+  },
+
+  /**
+   * Leave a group
+   */
+  async leaveGroup(groupId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Check if owner
+    const { data: membership } = await supabase
+      .from('group_members')
+      .select('role')
+      .eq('group_id', groupId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (membership?.role === 'owner') {
+      throw new Error('Owner cannot leave the group. Transfer ownership first or delete the group.');
+    }
+
+    const { error } = await supabase
+      .from('group_members')
+      .update({ is_active: false })
+      .eq('group_id', groupId)
+      .eq('user_id', user.id);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Update a member's role
+   */
+  async updateMemberRole(groupId: string, userId: string, role: MemberRole): Promise<void> {
+    const { error } = await supabase
+      .from('group_members')
+      .update({ role })
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Remove a member from a group
+   */
+  async removeMember(groupId: string, userId: string): Promise<void> {
+    const { error } = await supabase
+      .from('group_members')
+      .update({ is_active: false })
+      .eq('group_id', groupId)
+      .eq('user_id', userId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Regenerate the invite code for a group
+   */
+  async regenerateInviteCode(groupId: string): Promise<string> {
+    // Generate new code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let newCode = '';
+    for (let i = 0; i < 8; i++) {
+      newCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+
+    const { data, error } = await supabase
+      .from('groups')
+      .update({ invite_code: newCode })
+      .eq('id', groupId)
+      .select('invite_code')
+      .single();
+
+    if (error) throw error;
+    return data.invite_code;
+  },
+
+  /**
+   * Get group members
+   */
+  async getGroupMembers(groupId: string): Promise<GroupMemberView[]> {
+    const { data, error } = await supabase
+      .from('group_members_view')
+      .select('*')
+      .eq('group_id', groupId);
+
+    if (error) throw error;
+    return data || [];
+  },
+};

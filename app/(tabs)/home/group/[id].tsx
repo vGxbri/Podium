@@ -2,37 +2,38 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { AwardCard } from "../../components/AwardCard";
-import { InviteModal } from "../../components/InviteModal";
-import { MemberAvatarsRow } from "../../components/MemberAvatar";
-import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
-import { Colors } from "../../constants/Colors";
-import { theme } from "../../constants/theme";
-import { getGroupById } from "../../data/mockData";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AwardCard } from "../../../../components/AwardCard";
+import { InviteModal } from "../../../../components/InviteModal";
+import { MemberAvatarsRow } from "../../../../components/MemberAvatar";
+import { Button } from "../../../../components/ui/Button";
+import { Card } from "../../../../components/ui/Card";
+import { Colors } from "../../../../constants/Colors";
+import { theme } from "../../../../constants/theme";
+import { getGroupById } from "../../../../data/mockData";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const group = getGroupById(id || "");
 
   if (!group) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundText}>Grupo no encontrado</Text>
           <Button title="Volver" onPress={() => router.back()} />
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -41,7 +42,7 @@ export default function GroupDetailScreen() {
   );
 
   const handleCreateAward = () => {
-    router.push(`/award/create?groupId=${group.id}`);
+    router.push(`/home/award/create?groupId=${group.id}`);
   };
 
   const handleInvite = () => {
@@ -62,10 +63,13 @@ export default function GroupDetailScreen() {
         }}
       />
 
-      <SafeAreaView style={styles.container} edges={["bottom"]}>
+      <View style={styles.container}>
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: 100 + insets.bottom }
+          ]}
           showsVerticalScrollIndicator={false}
         >
           {/* Group Header */}
@@ -145,7 +149,7 @@ export default function GroupDetailScreen() {
         {/* FAB for admins */}
         {isAdmin && (
           <TouchableOpacity
-            style={styles.fab}
+            style={[styles.fab, { bottom: 24 + insets.bottom }]}
             onPress={handleCreateAward}
             activeOpacity={0.8}
           >
@@ -160,7 +164,7 @@ export default function GroupDetailScreen() {
           inviteCode={group.inviteCode}
           groupName={group.name}
         />
-      </SafeAreaView>
+      </View>
     </>
   );
 }
@@ -175,7 +179,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing.lg,
-    paddingBottom: 100,
   },
   notFound: {
     flex: 1,
@@ -297,7 +300,6 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: "absolute",
-    bottom: 24,
     right: 24,
     width: 60,
     height: 60,
