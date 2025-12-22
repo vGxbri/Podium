@@ -49,7 +49,7 @@ export const awardsService = {
       .from('nominees')
       .select(`
         *,
-        user:profiles (*)
+        user:profiles!nominees_user_id_fkey (*)
       `)
       .eq('award_id', awardId)
       .order('vote_count', { ascending: false });
@@ -58,9 +58,14 @@ export const awardsService = {
 
     return {
       ...award,
+      // Hide winner_id if not revealed for non-admins? 
+      // Actually frontend should handle UI hiding, but better to be safe? 
+      // For now let's just pass it and trust UI since RLS isn't complex enough yet.
       nominees: (nominees || []).map(n => ({
         ...n,
         user: n.user as any,
+        // Hide winner status if not revealed
+        is_winner: award.is_revealed ? n.is_winner : false, 
       })) as NomineeWithProfile[],
     };
   },
@@ -143,8 +148,12 @@ export const awardsService = {
   /**
    * Change award status
    */
-  async updateAwardStatus(awardId: string, status: AwardStatus): Promise<Award> {
+  async updateAwardStatus(awardId: string, status: AwardStatus, votingEndsAt?: string): Promise<Award> {
     const updates: Partial<Award> = { status };
+    
+    if (status === 'voting' && votingEndsAt) {
+      updates.voting_ends_at = votingEndsAt;
+    }
     
     if (status === 'completed') {
       updates.completed_at = new Date().toISOString();
@@ -201,6 +210,20 @@ export const awardsService = {
   async vote(awardId: string, nomineeId: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
+
+    // Check if user is a nominee for this award
+    const { data: nomineeCheck, error: checkError } = await supabase
+      .from('nominees')
+      .select('id')
+      .eq('award_id', awardId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (checkError) throw checkError;
+
+    if (nomineeCheck) {
+      throw new Error('No puedes votar en un premio donde estás nominado');
+    }
 
     const { error } = await supabase
       .from('votes')
@@ -302,5 +325,20 @@ export const awardsService = {
 
     if (error) throw error;
     return data || [];
+  },
+
+  /**
+   * Reveal the winner
+   */
+  async revealWinner(awardId: string): Promise<Award> {
+    const { data, error } = await supabase
+      .from('awards')
+      .update({ is_revealed: true })
+      .eq('id', awardId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
   },
 };

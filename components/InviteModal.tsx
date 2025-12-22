@@ -2,13 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import React from "react";
 import {
-    Modal,
-    Pressable,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Modal,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Colors } from "../constants/Colors";
 import { theme } from "../constants/theme";
@@ -28,17 +28,19 @@ export const InviteModal: React.FC<InviteModalProps> = ({
   inviteCode,
   groupName,
 }) => {
-  const inviteLink = `podium://join/${inviteCode}`;
+  // App link for sharing and copying
+  const appLink = `podium://join/${inviteCode}`;
 
   const handleCopyLink = async () => {
-    await Clipboard.setStringAsync(inviteLink);
+    await Clipboard.setStringAsync(appLink);
     // Could show a toast here
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `¡Únete a "${groupName}" en Podium! 🏆\n\n${inviteLink}`,
+        message: `¡Únete a mi grupo "${groupName}" en Podium! 🏆\n\nAbre este enlace en tu móvil:\n${appLink}\n\nO usa el código: ${inviteCode}`,
+        title: `Únete a ${groupName} en Podium`,
       });
     } catch (error) {
       console.error(error);
@@ -76,7 +78,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
               <Text style={styles.linkLabel}>Enlace de invitación</Text>
               <View style={styles.linkRow}>
                 <Text style={styles.linkText} numberOfLines={1}>
-                  {inviteLink}
+                  {appLink}
                 </Text>
                 <TouchableOpacity onPress={handleCopyLink} style={styles.copyButton}>
                   <Ionicons name="copy-outline" size={20} color={Colors.primary} />

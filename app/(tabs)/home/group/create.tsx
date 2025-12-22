@@ -1,6 +1,7 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +14,7 @@ import { Button } from "../../../../components/ui/Button";
 import { Input } from "../../../../components/ui/Input";
 import { Colors } from "../../../../constants/Colors";
 import { theme } from "../../../../constants/theme";
+import { groupsService } from "../../../../services";
 
 const groupIcons = ["🏆", "🎉", "⭐", "🎄", "🎯", "🔥", "💎", "🎭"];
 
@@ -23,15 +25,34 @@ export default function CreateGroupScreen() {
   const [description, setDescription] = useState("");
   const [selectedIcon, setSelectedIcon] = useState("🏆");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
 
-    setLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setLoading(false);
-    router.back();
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const newGroup = await groupsService.createGroup({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        icon: selectedIcon,
+      });
+      
+      // Navigate to the newly created group
+      router.replace({
+        pathname: "/home/group/[id]",
+        params: { id: newGroup.id }
+      });
+    } catch (err) {
+      console.error("Error creating group:", err);
+      const message = err instanceof Error ? err.message : "Error al crear el grupo";
+      setError(message);
+      Alert.alert("Error", message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

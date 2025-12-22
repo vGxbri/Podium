@@ -19,6 +19,7 @@ interface ButtonProps {
   loading?: boolean;
   icon?: React.ReactNode;
   style?: ViewStyle;
+  textStyle?: TextStyle;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -30,6 +31,7 @@ export const Button: React.FC<ButtonProps> = ({
   loading = false,
   icon,
   style,
+  textStyle: customTextStyle,
 }) => {
   const buttonStyles: ViewStyle[] = [
     styles.base,
@@ -43,7 +45,8 @@ export const Button: React.FC<ButtonProps> = ({
     styles.text,
     styles[`text_${variant}`],
     styles[`textSize_${size}`],
-  ];
+    customTextStyle,
+  ].filter(Boolean) as TextStyle[];
 
   return (
     <TouchableOpacity

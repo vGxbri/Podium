@@ -47,6 +47,13 @@ export default function HomeStackLayout() {
           presentation: "modal",
         }}
       />
+      <Stack.Screen
+        name="group/join"
+        options={{
+          title: "Unirse a grupo",
+          presentation: "modal",
+        }}
+      />
     </Stack>
   );
 }

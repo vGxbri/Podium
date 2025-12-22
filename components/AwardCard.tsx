@@ -3,26 +3,29 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { theme } from '../constants/theme';
-import { Award } from '../types';
+import { Award, AwardWithNominees } from '../types/database';
 import { Card } from './ui/Card';
 
 interface AwardCardProps {
-  award: Award;
+  award: Award | AwardWithNominees;
+  nomineeCount?: number;
   onPress?: () => void;
 }
 
-const statusConfig = {
-  draft: { label: 'Borrador', color: Colors.textLight, icon: 'document-outline' as const },
-  active: { label: 'Activo', color: Colors.success, icon: 'checkmark-circle' as const },
-  voting: { label: 'Votando', color: Colors.warning, icon: 'hourglass' as const },
-  completed: { label: 'Completado', color: Colors.primary, icon: 'trophy' as const },
+const statusConfig: Record<string, { label: string; color: string; icon: 'document-outline' | 'checkmark-circle' | 'hourglass' | 'trophy' | 'archive-outline' }> = {
+  draft: { label: 'Borrador', color: Colors.textLight, icon: 'document-outline' },
+  nominations: { label: 'Nominaciones', color: Colors.info, icon: 'document-outline' },
+  voting: { label: 'Votando', color: Colors.warning, icon: 'hourglass' },
+  completed: { label: 'Completado', color: Colors.primary, icon: 'trophy' },
+  archived: { label: 'Archivado', color: Colors.textLight, icon: 'archive-outline' },
 };
 
-export const AwardCard: React.FC<AwardCardProps> = ({ award, onPress }) => {
-  const status = statusConfig[award.status];
+export const AwardCard: React.FC<AwardCardProps> = ({ award, nomineeCount, onPress }) => {
+  const status = statusConfig[award.status] || statusConfig.draft;
+  const nominees = 'nominees' in award ? award.nominees.length : (nomineeCount || 0);
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.8 : 1}>
+    <TouchableOpacity onPress={onPress} activeOpacity={onPress ? 0.8 : 1} disabled={!onPress}>
       <Card variant="glass" padding="md" style={styles.card}>
         <View style={styles.header}>
           <View style={styles.iconContainer}>
@@ -47,7 +50,7 @@ export const AwardCard: React.FC<AwardCardProps> = ({ award, onPress }) => {
         <View style={styles.footer}>
           <Ionicons name="people" size={14} color={Colors.textSecondary} />
           <Text style={styles.nominees}>
-            {award.nominees.length} nominados
+            {nominees} nominados
           </Text>
         </View>
       </Card>

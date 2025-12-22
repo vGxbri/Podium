@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,7 +19,8 @@ import { Card } from "../../../../components/ui/Card";
 import { Input } from "../../../../components/ui/Input";
 import { Colors } from "../../../../constants/Colors";
 import { theme } from "../../../../constants/theme";
-import { getGroupById } from "../../../../data/mockData";
+import { useGroup } from "../../../../hooks";
+import { awardsService } from "../../../../services";
 
 const awardIcons = ["🏆", "🌟", "🎖️", "🥇", "👑", "💎", "🏅", "⭐"];
 
@@ -26,7 +29,7 @@ export default function CreateAwardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   
-  const group = getGroupById(groupId || "");
+  const { group, isLoading: groupLoading } = useGroup(groupId);
   
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -34,10 +37,23 @@ export default function CreateAwardScreen() {
   const [selectedNominees, setSelectedNominees] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Loading state
+  if (groupLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Cargando...</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (!group) {
     return (
       <View style={styles.container}>
         <View style={styles.notFound}>
+          <Ionicons name="warning-outline" size={48} color={Colors.textLight} />
           <Text style={styles.notFoundText}>Grupo no encontrado</Text>
           <Button title="Volver" onPress={() => router.back()} />
         </View>
@@ -54,13 +70,26 @@ export default function CreateAwardScreen() {
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || selectedNominees.length < 2) return;
+    if (!name.trim() || selectedNominees.length < 2 || !groupId) return;
 
-    setLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setLoading(false);
-    router.back();
+    try {
+      setLoading(true);
+      
+      await awardsService.createAward({
+        group_id: groupId,
+        name: name.trim(),
+        description: description.trim() || undefined,
+        icon: selectedIcon,
+        nominee_ids: selectedNominees,
+      });
+      
+      router.back();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error al crear el premio";
+      Alert.alert("Error", message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -125,33 +154,39 @@ export default function CreateAwardScreen() {
             </Text>
 
             <Card variant="glass" padding="sm" style={styles.nomineesCard}>
-              {group.members.map((member) => {
-                const isSelected = selectedNominees.includes(member.userId);
-                return (
-                  <TouchableOpacity
-                    key={member.userId}
-                    style={[
-                      styles.nomineeRow,
-                      isSelected && styles.nomineeRowSelected,
-                    ]}
-                    onPress={() => toggleNominee(member.userId)}
-                    activeOpacity={0.7}
-                  >
-                    <MemberAvatar user={member.user} size="sm" />
-                    <Text style={styles.nomineeName}>{member.user.name}</Text>
-                    <View
+              {group.members.length === 0 ? (
+                <Text style={styles.noMembersText}>
+                  No hay miembros en el grupo
+                </Text>
+              ) : (
+                group.members.map((member) => {
+                  const isSelected = selectedNominees.includes(member.user_id);
+                  return (
+                    <TouchableOpacity
+                      key={member.user_id}
                       style={[
-                        styles.checkbox,
-                        isSelected && styles.checkboxSelected,
+                        styles.nomineeRow,
+                        isSelected && styles.nomineeRowSelected,
                       ]}
+                      onPress={() => toggleNominee(member.user_id)}
+                      activeOpacity={0.7}
                     >
-                      {isSelected && (
-                        <Ionicons name="checkmark" size={14} color={Colors.textOnPrimary} />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                      <MemberAvatar user={member} size="sm" />
+                      <Text style={styles.nomineeName}>{member.display_name}</Text>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          isSelected && styles.checkboxSelected,
+                        ]}
+                      >
+                        {isSelected && (
+                          <Ionicons name="checkmark" size={14} color={Colors.textOnPrimary} />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </Card>
           </View>
         </ScrollView>
@@ -184,6 +219,15 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
   },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: theme.spacing.md,
+    color: Colors.textSecondary,
+  },
   notFound: {
     flex: 1,
     justifyContent: "center",
@@ -193,7 +237,7 @@ const styles = StyleSheet.create({
   notFoundText: {
     fontSize: 18,
     color: Colors.textSecondary,
-    marginBottom: theme.spacing.lg,
+    marginVertical: theme.spacing.lg,
   },
   section: {
     marginBottom: theme.spacing.lg,
@@ -243,6 +287,11 @@ const styles = StyleSheet.create({
   },
   nomineesCard: {
     gap: 2,
+  },
+  noMembersText: {
+    color: Colors.textSecondary,
+    textAlign: "center",
+    padding: theme.spacing.md,
   },
   nomineeRow: {
     flexDirection: "row",

@@ -1,10 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Colors } from '../constants/Colors';
-import { User } from '../types';
+import { GroupMemberView, Profile } from '../types/database';
+
+// Accept either a Profile or a GroupMemberView (which has display_name instead of name)
+type UserLike = Profile | GroupMemberView | { id: string; display_name: string; avatar_url?: string | null };
 
 interface MemberAvatarProps {
-  user: User;
+  user: UserLike;
   size?: 'sm' | 'md' | 'lg';
   showName?: boolean;
   style?: ViewStyle;
@@ -32,15 +35,20 @@ const getInitials = (name: string) => {
     .slice(0, 2);
 };
 
+const getUserName = (user: UserLike): string => {
+  return user.display_name || 'Usuario';
+};
+
 export const MemberAvatar: React.FC<MemberAvatarProps> = ({
   user,
   size = 'md',
   showName = false,
   style,
 }) => {
+  const name = getUserName(user);
   const sizeValue = size === 'sm' ? 32 : size === 'md' ? 40 : 56;
   const fontSize = size === 'sm' ? 12 : size === 'md' ? 14 : 20;
-  const backgroundColor = getAvatarColor(user.name);
+  const backgroundColor = getAvatarColor(name);
 
   return (
     <View style={[styles.container, style]}>
@@ -56,12 +64,12 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
         ]}
       >
         <Text style={[styles.initials, { fontSize }]}>
-          {getInitials(user.name)}
+          {getInitials(name)}
         </Text>
       </View>
       {showName && (
         <Text style={styles.name} numberOfLines={1}>
-          {user.name}
+          {name}
         </Text>
       )}
     </View>
@@ -70,7 +78,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
 
 // Row of avatars with overlap
 interface MemberAvatarsRowProps {
-  users: User[];
+  users: UserLike[];
   max?: number;
   size?: 'sm' | 'md';
 }

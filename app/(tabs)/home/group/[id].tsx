@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +19,7 @@ import { Button } from "../../../../components/ui/Button";
 import { Card } from "../../../../components/ui/Card";
 import { Colors } from "../../../../constants/Colors";
 import { theme } from "../../../../constants/theme";
-import { getGroupById } from "../../../../data/mockData";
+import { useGroup } from "../../../../hooks";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,30 +27,58 @@ export default function GroupDetailScreen() {
   const insets = useSafeAreaInsets();
   const [showInviteModal, setShowInviteModal] = useState(false);
 
-  const group = getGroupById(id || "");
+  const { 
+    group, 
+    isLoading, 
+    error, 
+    refetch, 
+    isAdmin, 
+    isOwner 
+  } = useGroup(id);
 
-  if (!group) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.notFound}>
-          <Text style={styles.notFoundText}>Grupo no encontrado</Text>
-          <Button title="Volver" onPress={() => router.back()} />
-        </View>
-      </View>
-    );
-  }
-
-  const isAdmin = group.members.some(
-    (m) => m.userId === "1" && m.role === "admin"
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
   );
 
   const handleCreateAward = () => {
-    router.push(`/home/award/create?groupId=${group.id}`);
+    router.push({
+      pathname: "/home/award/create",
+      params: { groupId: id }
+    });
   };
 
   const handleInvite = () => {
     setShowInviteModal(true);
   };
+
+  // Loading state
+  if (isLoading && !group) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Cargando grupo...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error || !group) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.notFound}>
+          <Ionicons name="warning-outline" size={48} color={Colors.textLight} />
+          <Text style={styles.notFoundText}>
+            {error ? "Error al cargar el grupo" : "Grupo no encontrado"}
+          </Text>
+          <Button title="Volver" onPress={() => router.back()} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <>
@@ -56,7 +87,13 @@ export default function GroupDetailScreen() {
           title: group.name,
           headerRight: () =>
             isAdmin ? (
-              <TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.headerButton}
+                onPress={() => router.push({
+                  pathname: "/home/group/settings",
+                  params: { id }
+                })}
+              >
                 <Ionicons name="settings-outline" size={24} color={Colors.primary} />
               </TouchableOpacity>
             ) : null,
@@ -71,6 +108,14 @@ export default function GroupDetailScreen() {
             { paddingBottom: 100 + insets.bottom }
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={refetch}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
+            />
+          }
         >
           {/* Group Header */}
           <Card variant="elevated" padding="lg" style={styles.headerCard}>
@@ -84,14 +129,20 @@ export default function GroupDetailScreen() {
                   <Text style={styles.groupDescription}>{group.description}</Text>
                 )}
                 <View style={styles.badgeRow}>
-                  {isAdmin && (
+                  {isOwner && (
+                    <View style={[styles.adminBadge, styles.ownerBadge]}>
+                      <Ionicons name="star" size={12} color={Colors.gold} />
+                      <Text style={styles.ownerText}>Creador</Text>
+                    </View>
+                  )}
+                  {isAdmin && !isOwner && (
                     <View style={styles.adminBadge}>
                       <Ionicons name="shield-checkmark" size={12} color={Colors.primary} />
                       <Text style={styles.adminText}>Admin</Text>
                     </View>
                   )}
                   <Text style={styles.memberCount}>
-                    {group.memberCount} miembros
+                    {group.member_count} miembros
                   </Text>
                 </View>
               </View>
@@ -111,11 +162,15 @@ export default function GroupDetailScreen() {
             </View>
 
             <Card variant="glass" padding="md">
-              <MemberAvatarsRow
-                users={group.members.map((m) => m.user)}
-                max={6}
-                size="md"
-              />
+              {group.members.length > 0 ? (
+                <MemberAvatarsRow
+                  users={group.members}
+                  max={6}
+                  size="md"
+                />
+              ) : (
+                <Text style={styles.noMembersText}>No hay miembros aún</Text>
+              )}
             </Card>
           </View>
 
@@ -123,10 +178,10 @@ export default function GroupDetailScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Premios</Text>
-              <Text style={styles.awardCount}>{group.awards.length}</Text>
+              <Text style={styles.awardCount}>{group.awards?.length || 0}</Text>
             </View>
 
-            {group.awards.length === 0 ? (
+            {!group.awards || group.awards.length === 0 ? (
               <Card variant="glass" padding="lg">
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyIcon}>🏆</Text>
@@ -136,18 +191,35 @@ export default function GroupDetailScreen() {
                       ? "Crea el primer premio para este grupo"
                       : "El administrador aún no ha creado premios"}
                   </Text>
+                  {isAdmin && (
+                    <TouchableOpacity 
+                      style={styles.createAwardButton}
+                      onPress={handleCreateAward}
+                    >
+                      <Text style={styles.createAwardText}>+ Crear Premio</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </Card>
             ) : (
               group.awards.map((award) => (
-                <AwardCard key={award.id} award={award} />
+                <AwardCard 
+                  key={award.id} 
+                  award={award}
+                  onPress={() => {
+                    router.push({
+                      pathname: "/home/award/[id]",
+                      params: { id: award.id, groupId: id }
+                    });
+                  }}
+                />
               ))
             )}
           </View>
         </ScrollView>
 
         {/* FAB for admins */}
-        {isAdmin && (
+        {isAdmin && group.awards && group.awards.length > 0 && (
           <TouchableOpacity
             style={[styles.fab, { bottom: 24 + insets.bottom }]}
             onPress={handleCreateAward}
@@ -161,7 +233,7 @@ export default function GroupDetailScreen() {
         <InviteModal
           visible={showInviteModal}
           onClose={() => setShowInviteModal(false)}
-          inviteCode={group.inviteCode}
+          inviteCode={group.invite_code}
           groupName={group.name}
         />
       </View>
@@ -180,6 +252,15 @@ const styles = StyleSheet.create({
   content: {
     padding: theme.spacing.lg,
   },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: theme.spacing.md,
+    color: Colors.textSecondary,
+  },
   notFound: {
     flex: 1,
     justifyContent: "center",
@@ -189,7 +270,10 @@ const styles = StyleSheet.create({
   notFoundText: {
     fontSize: 18,
     color: Colors.textSecondary,
-    marginBottom: theme.spacing.lg,
+    marginVertical: theme.spacing.lg,
+  },
+  headerButton: {
+    padding: 8,
   },
   headerCard: {
     marginBottom: theme.spacing.lg,
@@ -238,10 +322,18 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: theme.borderRadius.full,
   },
+  ownerBadge: {
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+  },
   adminText: {
     fontSize: 12,
     fontWeight: "600",
     color: Colors.primary,
+  },
+  ownerText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: Colors.gold,
   },
   memberCount: {
     fontSize: 13,
@@ -279,6 +371,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: Colors.primary,
   },
+  noMembersText: {
+    color: Colors.textSecondary,
+    textAlign: "center",
+    padding: theme.spacing.md,
+  },
   emptyState: {
     alignItems: "center",
     paddingVertical: theme.spacing.md,
@@ -297,6 +394,17 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 4,
     textAlign: "center",
+  },
+  createAwardButton: {
+    marginTop: theme.spacing.md,
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: Colors.primary,
+    borderRadius: theme.borderRadius.md,
+  },
+  createAwardText: {
+    color: Colors.textOnPrimary,
+    fontWeight: "600",
   },
   fab: {
     position: "absolute",

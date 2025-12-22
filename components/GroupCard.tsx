@@ -3,15 +3,17 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from '../constants/Colors';
 import { theme } from '../constants/theme';
-import { Group } from '../types';
+import { GroupWithDetails } from '../types/database';
 import { Card } from './ui/Card';
 
 interface GroupCardProps {
-  group: Group;
+  group: GroupWithDetails;
   onPress: () => void;
 }
 
 export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
+  const awardCount = group.awards?.length || 0;
+  
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
       <Card variant="elevated" padding="md" style={styles.card}>
@@ -24,12 +26,12 @@ export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
             <Text style={styles.title}>{group.name}</Text>
             <View style={styles.metaRow}>
               <Ionicons name="people" size={14} color={Colors.textSecondary} />
-              <Text style={styles.members}>{group.memberCount} miembros</Text>
-              {group.awards.length > 0 && (
+              <Text style={styles.members}>{group.member_count} miembros</Text>
+              {awardCount > 0 && (
                 <>
                   <View style={styles.dot} />
                   <Ionicons name="trophy" size={14} color={Colors.gold} />
-                  <Text style={styles.awards}>{group.awards.length} premios</Text>
+                  <Text style={styles.awards}>{awardCount} premios</Text>
                 </>
               )}
             </View>
