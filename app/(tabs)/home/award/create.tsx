@@ -2,23 +2,27 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import {
+    ActivityIndicator,
+    Button,
+    Card,
+    Checkbox,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
+} from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
-import { Button } from "../../../../components/ui/Button";
-import { Card } from "../../../../components/ui/Card";
-import { Input } from "../../../../components/ui/Input";
-import { Colors } from "../../../../constants/Colors";
-import { theme } from "../../../../constants/theme";
+import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
 
@@ -28,6 +32,7 @@ export default function CreateAwardScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   
   const { group, isLoading: groupLoading } = useGroup(groupId);
   
@@ -40,10 +45,12 @@ export default function CreateAwardScreen() {
   // Loading state
   if (groupLoading) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Cargando...</Text>
+          <ActivityIndicator size="large" />
+          <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
+            Cargando...
+          </Text>
         </View>
       </View>
     );
@@ -51,11 +58,13 @@ export default function CreateAwardScreen() {
 
   if (!group) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.notFound}>
-          <Ionicons name="warning-outline" size={48} color={Colors.textLight} />
-          <Text style={styles.notFoundText}>Grupo no encontrado</Text>
-          <Button title="Volver" onPress={() => router.back()} />
+          <Ionicons name="warning-outline" size={48} color={theme.colors.onSurfaceVariant} />
+          <Text variant="bodyLarge" style={{ marginVertical: 16, color: theme.colors.onSurfaceVariant }}>
+            Grupo no encontrado
+          </Text>
+          <Button mode="contained" onPress={() => router.back()}>Volver</Button>
         </View>
       </View>
     );
@@ -93,7 +102,7 @@ export default function CreateAwardScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -105,14 +114,19 @@ export default function CreateAwardScreen() {
         >
           {/* Icon Selector */}
           <View style={styles.section}>
-            <Text style={styles.label}>Icono del premio</Text>
+            <Text variant="labelLarge" style={{ marginBottom: 8 }}>
+              Icono del premio
+            </Text>
             <View style={styles.iconGrid}>
               {awardIcons.map((icon) => (
                 <TouchableOpacity
                   key={icon}
                   style={[
                     styles.iconButton,
-                    selectedIcon === icon && styles.iconButtonSelected,
+                    { 
+                      backgroundColor: selectedIcon === icon ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                      borderColor: selectedIcon === icon ? theme.colors.primary : 'transparent'
+                    },
                   ]}
                   onPress={() => setSelectedIcon(icon)}
                 >
@@ -123,83 +137,86 @@ export default function CreateAwardScreen() {
           </View>
 
           {/* Award Name */}
-          <Input
+          <TextInput
             label="Nombre del premio"
             placeholder="ej. Mejor Amigo del Año"
             value={name}
             onChangeText={setName}
-            autoCapitalize="words"
+            mode="outlined"
+            style={styles.input}
           />
 
           {/* Description */}
-          <Input
+          <TextInput
             label="Descripción (opcional)"
             placeholder="Describe este premio..."
             value={description}
             onChangeText={setDescription}
+            mode="outlined"
             multiline
             numberOfLines={2}
+            style={styles.input}
           />
 
           {/* Nominees Section */}
           <View style={styles.section}>
             <View style={styles.nomineesHeader}>
-              <Text style={styles.label}>Seleccionar nominados</Text>
-              <Text style={styles.nomineeCount}>
+              <Text variant="labelLarge">Seleccionar nominados</Text>
+              <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
                 {selectedNominees.length} seleccionados
               </Text>
             </View>
-            <Text style={styles.helperText}>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
               Mínimo 2 nominados requeridos
             </Text>
 
-            <Card variant="glass" padding="sm" style={styles.nomineesCard}>
-              {group.members.length === 0 ? (
-                <Text style={styles.noMembersText}>
-                  No hay miembros en el grupo
-                </Text>
-              ) : (
-                group.members.map((member) => {
-                  const isSelected = selectedNominees.includes(member.user_id);
-                  return (
-                    <TouchableOpacity
-                      key={member.user_id}
-                      style={[
-                        styles.nomineeRow,
-                        isSelected && styles.nomineeRowSelected,
-                      ]}
-                      onPress={() => toggleNominee(member.user_id)}
-                      activeOpacity={0.7}
-                    >
-                      <MemberAvatar user={member} size="sm" />
-                      <Text style={styles.nomineeName}>{member.display_name}</Text>
-                      <View
+            <Card mode="outlined">
+              <Card.Content>
+                {group.members.length === 0 ? (
+                  <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
+                    No hay miembros en el grupo
+                  </Text>
+                ) : (
+                  group.members.map((member) => {
+                    const isSelected = selectedNominees.includes(member.user_id);
+                    return (
+                      <TouchableOpacity
+                        key={member.user_id}
                         style={[
-                          styles.checkbox,
-                          isSelected && styles.checkboxSelected,
+                          styles.nomineeRow,
+                          isSelected && { backgroundColor: theme.colors.secondaryContainer },
                         ]}
+                        onPress={() => toggleNominee(member.user_id)}
+                        activeOpacity={0.7}
                       >
-                        {isSelected && (
-                          <Ionicons name="checkmark" size={14} color={Colors.textOnPrimary} />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
-              )}
+                        <MemberAvatar user={member} size="sm" />
+                        <Text variant="bodyMedium" style={{ flex: 1, marginLeft: 12 }}>
+                          {member.display_name}
+                        </Text>
+                        <Checkbox
+                          status={isSelected ? 'checked' : 'unchecked'}
+                          onPress={() => toggleNominee(member.user_id)}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </Card.Content>
             </Card>
           </View>
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={[styles.footer, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+        <Surface style={[styles.footer, { paddingBottom: appTheme.spacing.lg + insets.bottom, backgroundColor: theme.colors.surface }]} elevation={1}>
           <Button
-            title="Crear Premio"
+            mode="contained"
             onPress={handleCreate}
             loading={loading}
             disabled={!name.trim() || selectedNominees.length < 2}
-          />
-        </View>
+          >
+            Crear Premio
+          </Button>
+        </Surface>
       </KeyboardAvoidingView>
     </View>
   );
@@ -208,7 +225,6 @@ export default function CreateAwardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -217,115 +233,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   centerContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    color: Colors.textSecondary,
-  },
   notFound: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: theme.spacing.lg,
-  },
-  notFoundText: {
-    fontSize: 18,
-    color: Colors.textSecondary,
-    marginVertical: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   section: {
-    marginBottom: theme.spacing.lg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 8,
+    marginBottom: appTheme.spacing.lg,
   },
   iconGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.sm,
+    gap: appTheme.spacing.sm,
   },
   iconButton: {
     width: 52,
     height: 52,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: Colors.surface,
+    borderRadius: appTheme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "transparent",
-  },
-  iconButtonSelected: {
-    borderColor: Colors.gold,
-    backgroundColor: Colors.backgroundLight,
   },
   iconText: {
     fontSize: 28,
+  },
+  input: {
+    marginBottom: appTheme.spacing.md,
   },
   nomineesHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-  },
-  nomineeCount: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: "500",
-  },
-  helperText: {
-    fontSize: 12,
-    color: Colors.textLight,
-    marginBottom: 12,
-  },
-  nomineesCard: {
-    gap: 2,
-  },
-  noMembersText: {
-    color: Colors.textSecondary,
-    textAlign: "center",
-    padding: theme.spacing.md,
+    marginBottom: 4,
   },
   nomineeRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.md,
-  },
-  nomineeRowSelected: {
-    backgroundColor: Colors.backgroundLight,
-  },
-  nomineeName: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.text,
-    marginLeft: theme.spacing.md,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    padding: appTheme.spacing.sm,
+    borderRadius: appTheme.borderRadius.md,
+    marginBottom: 2,
   },
   footer: {
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.background,
+    padding: appTheme.spacing.lg,
+    paddingTop: appTheme.spacing.md,
   },
 });

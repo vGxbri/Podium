@@ -3,28 +3,35 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
+  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View
 } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Chip,
+  FAB,
+  Surface,
+  Text,
+  useTheme
+} from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AwardCard } from "../../../../components/AwardCard";
 import { InviteModal } from "../../../../components/InviteModal";
-import { MemberAvatarsRow } from "../../../../components/MemberAvatar";
-import { Button } from "../../../../components/ui/Button";
-import { Card } from "../../../../components/ui/Card";
-import { Colors } from "../../../../constants/Colors";
-import { theme } from "../../../../constants/theme";
+import { MemberAvatar } from "../../../../components/MemberAvatar";
+import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const { 
@@ -32,6 +39,7 @@ export default function GroupDetailScreen() {
     isLoading, 
     error, 
     refetch, 
+    removeMember,
     isAdmin, 
     isOwner 
   } = useGroup(id);
@@ -56,10 +64,12 @@ export default function GroupDetailScreen() {
   // Loading state
   if (isLoading && !group) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Cargando grupo...</Text>
+          <ActivityIndicator size="large" />
+          <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
+            Cargando grupo...
+          </Text>
         </View>
       </View>
     );
@@ -68,13 +78,13 @@ export default function GroupDetailScreen() {
   // Error state
   if (error || !group) {
     return (
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.notFound}>
-          <Ionicons name="warning-outline" size={48} color={Colors.textLight} />
-          <Text style={styles.notFoundText}>
+          <Ionicons name="warning-outline" size={48} color={theme.colors.onSurfaceVariant} />
+          <Text variant="bodyLarge" style={{ marginVertical: 16, color: theme.colors.onSurfaceVariant }}>
             {error ? "Error al cargar el grupo" : "Grupo no encontrado"}
           </Text>
-          <Button title="Volver" onPress={() => router.back()} />
+          <Button mode="contained" onPress={() => router.back()}>Volver</Button>
         </View>
       </View>
     );
@@ -94,13 +104,13 @@ export default function GroupDetailScreen() {
                   params: { id }
                 })}
               >
-                <Ionicons name="settings-outline" size={24} color={Colors.primary} />
+                <Ionicons name="settings-outline" size={24} color={theme.colors.primary} />
               </TouchableOpacity>
             ) : null,
         }}
       />
 
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[
@@ -112,94 +122,144 @@ export default function GroupDetailScreen() {
             <RefreshControl
               refreshing={isLoading}
               onRefresh={refetch}
-              colors={[Colors.primary]}
-              tintColor={Colors.primary}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
             />
           }
         >
           {/* Group Header */}
-          <Card variant="elevated" padding="lg" style={styles.headerCard}>
+          <Surface style={[styles.headerCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
             <View style={styles.headerRow}>
-              <View style={styles.groupIcon}>
+              <Surface style={[styles.groupIcon, { backgroundColor: theme.colors.surface }]} elevation={0}>
                 <Text style={styles.groupIconText}>{group.icon || "🏆"}</Text>
-              </View>
+              </Surface>
               <View style={styles.headerInfo}>
-                <Text style={styles.groupName}>{group.name}</Text>
+                <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                  {group.name}
+                </Text>
                 {group.description && (
-                  <Text style={styles.groupDescription}>{group.description}</Text>
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
+                    {group.description}
+                  </Text>
                 )}
                 <View style={styles.badgeRow}>
                   {isOwner && (
-                    <View style={[styles.adminBadge, styles.ownerBadge]}>
-                      <Ionicons name="star" size={12} color={Colors.gold} />
-                      <Text style={styles.ownerText}>Creador</Text>
-                    </View>
+                    <Chip icon="star" compact style={{ backgroundColor: 'rgba(255, 215, 0, 0.15)' }}>
+                      Creador
+                    </Chip>
                   )}
                   {isAdmin && !isOwner && (
-                    <View style={styles.adminBadge}>
-                      <Ionicons name="shield-checkmark" size={12} color={Colors.primary} />
-                      <Text style={styles.adminText}>Admin</Text>
-                    </View>
+                    <Chip icon="shield-check" compact>
+                      Admin
+                    </Chip>
                   )}
-                  <Text style={styles.memberCount}>
+                  <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
                     {group.member_count} miembros
                   </Text>
                 </View>
               </View>
             </View>
-          </Card>
+          </Surface>
 
           {/* Members Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Miembros</Text>
-              <TouchableOpacity onPress={handleInvite}>
-                <View style={styles.inviteButton}>
-                  <Ionicons name="person-add" size={16} color={Colors.primary} />
-                  <Text style={styles.inviteText}>Invitar</Text>
-                </View>
-              </TouchableOpacity>
+              <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                Miembros
+              </Text>
+              <Button mode="text" compact onPress={handleInvite} icon="account-plus">
+                Invitar
+              </Button>
             </View>
 
-            <Card variant="glass" padding="md">
-              {group.members.length > 0 ? (
-                <MemberAvatarsRow
-                  users={group.members}
-                  max={6}
-                  size="md"
-                />
-              ) : (
-                <Text style={styles.noMembersText}>No hay miembros aún</Text>
-              )}
+            <Card mode="outlined">
+              <Card.Content>
+                {group.members.length > 0 ? (
+                  <View style={styles.membersList}>
+                    {group.members.map((member) => {
+                      const isMemberOwner = member.role === 'owner';
+                      const canRemove = isAdmin && !isMemberOwner && (isOwner || member.role !== 'admin');
+                      
+                      return (
+                        <View key={member.user_id} style={styles.memberRow}>
+                          <MemberAvatar user={member} size="sm" />
+                          <View style={styles.memberInfo}>
+                            <Text variant="bodyMedium" style={{ fontWeight: "500" }}>
+                              {member.display_name}
+                            </Text>
+                            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                              {member.role === 'owner' ? 'Propietario' : member.role === 'admin' ? 'Admin' : 'Miembro'}
+                            </Text>
+                          </View>
+                          {canRemove && (
+                            <TouchableOpacity
+                              style={styles.kickButton}
+                              onPress={() => {
+                                Alert.alert(
+                                  "Expulsar miembro",
+                                  `¿Seguro que quieres expulsar a ${member.display_name} del grupo?`,
+                                  [
+                                    { text: "Cancelar", style: "cancel" },
+                                    {
+                                      text: "Expulsar",
+                                      style: "destructive",
+                                      onPress: async () => {
+                                        try {
+                                          await removeMember(member.user_id);
+                                        } catch {
+                                          Alert.alert("Error", "No se pudo expulsar al miembro");
+                                        }
+                                      }
+                                    }
+                                  ]
+                                );
+                              }}
+                            >
+                              <Ionicons name="close-circle" size={24} color={theme.colors.error} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
+                    No hay miembros aún
+                  </Text>
+                )}
+              </Card.Content>
             </Card>
           </View>
 
           {/* Awards Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Premios</Text>
-              <Text style={styles.awardCount}>{group.awards?.length || 0}</Text>
+              <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                Premios
+              </Text>
+              <Surface style={[styles.awardBadge, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
+                <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                  {group.awards?.length || 0}
+                </Text>
+              </Surface>
             </View>
 
             {!group.awards || group.awards.length === 0 ? (
-              <Card variant="glass" padding="lg">
-                <View style={styles.emptyState}>
+              <Card mode="outlined">
+                <Card.Content style={styles.emptyState}>
                   <Text style={styles.emptyIcon}>🏆</Text>
-                  <Text style={styles.emptyText}>No hay premios aún</Text>
-                  <Text style={styles.emptySubtext}>
+                  <Text variant="titleMedium">No hay premios aún</Text>
+                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: "center" }}>
                     {isAdmin
                       ? "Crea el primer premio para este grupo"
                       : "El administrador aún no ha creado premios"}
                   </Text>
                   {isAdmin && (
-                    <TouchableOpacity 
-                      style={styles.createAwardButton}
-                      onPress={handleCreateAward}
-                    >
-                      <Text style={styles.createAwardText}>+ Crear Premio</Text>
-                    </TouchableOpacity>
+                    <Button mode="contained" onPress={handleCreateAward} style={{ marginTop: 16 }}>
+                      + Crear Premio
+                    </Button>
                   )}
-                </View>
+                </Card.Content>
               </Card>
             ) : (
               group.awards.map((award) => (
@@ -220,13 +280,11 @@ export default function GroupDetailScreen() {
 
         {/* FAB for admins */}
         {isAdmin && group.awards && group.awards.length > 0 && (
-          <TouchableOpacity
+          <FAB
+            icon="plus"
             style={[styles.fab, { bottom: 24 + insets.bottom }]}
             onPress={handleCreateAward}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={28} color={Colors.textOnPrimary} />
-          </TouchableOpacity>
+          />
         )}
 
         {/* Invite Modal */}
@@ -244,39 +302,31 @@ export default function GroupDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   centerContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    color: Colors.textSecondary,
-  },
   notFound: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: theme.spacing.lg,
-  },
-  notFoundText: {
-    fontSize: 18,
-    color: Colors.textSecondary,
-    marginVertical: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   headerButton: {
     padding: 8,
   },
   headerCard: {
-    marginBottom: theme.spacing.lg,
+    borderRadius: appTheme.borderRadius.lg,
+    padding: appTheme.spacing.lg,
+    marginBottom: appTheme.spacing.lg,
   },
   headerRow: {
     flexDirection: "row",
@@ -285,11 +335,10 @@ const styles = StyleSheet.create({
   groupIcon: {
     width: 64,
     height: 64,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: Colors.backgroundLight,
+    borderRadius: appTheme.borderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: theme.spacing.md,
+    marginRight: appTheme.spacing.md,
   },
   groupIconText: {
     fontSize: 32,
@@ -297,124 +346,51 @@ const styles = StyleSheet.create({
   headerInfo: {
     flex: 1,
   },
-  groupName: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  groupDescription: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
   badgeRow: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 8,
-    gap: 12,
-  },
-  adminBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.backgroundLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
-  },
-  ownerBadge: {
-    backgroundColor: 'rgba(255, 215, 0, 0.15)',
-  },
-  adminText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.primary,
-  },
-  ownerText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.gold,
-  },
-  memberCount: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    gap: 8,
   },
   section: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: appTheme.spacing.xl,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.md,
+    marginBottom: appTheme.spacing.md,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.text,
-  },
-  awardCount: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    backgroundColor: Colors.surface,
+  awardBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: appTheme.borderRadius.full,
   },
-  inviteButton: {
+  membersList: {
+    gap: appTheme.spacing.xs,
+  },
+  memberRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    paddingVertical: appTheme.spacing.xs,
   },
-  inviteText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: Colors.primary,
+  memberInfo: {
+    flex: 1,
+    marginLeft: appTheme.spacing.sm,
   },
-  noMembersText: {
-    color: Colors.textSecondary,
-    textAlign: "center",
-    padding: theme.spacing.md,
+  kickButton: {
+    padding: appTheme.spacing.xs,
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: theme.spacing.md,
+    paddingVertical: appTheme.spacing.md,
   },
   emptyIcon: {
     fontSize: 40,
-    marginBottom: theme.spacing.sm,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.text,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    textAlign: "center",
-  },
-  createAwardButton: {
-    marginTop: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
-    backgroundColor: Colors.primary,
-    borderRadius: theme.borderRadius.md,
-  },
-  createAwardText: {
-    color: Colors.textOnPrimary,
-    fontWeight: "600",
+    marginBottom: appTheme.spacing.sm,
   },
   fab: {
     position: "absolute",
     right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    ...theme.shadows.lg,
   },
 });

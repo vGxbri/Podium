@@ -1,22 +1,25 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import {
+  ActivityIndicator,
+  Button,
+  Card,
+  Switch,
+  Text,
+  TextInput,
+  useTheme,
+} from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "../../../../components/ui/Button";
-import { Input } from "../../../../components/ui/Input";
-import { Colors } from "../../../../constants/Colors";
-import { theme } from "../../../../constants/theme";
+import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 
 const predefinedIcons = ["🏆", "👥", "🏠", "💼", "🎮", "⚽", "🎵", "📚", "✈️", "❤️"];
@@ -25,6 +28,7 @@ export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   
   const { 
     group, 
@@ -99,7 +103,7 @@ export default function GroupSettingsScreen() {
               await deleteGroup();
               router.dismissAll();
               router.replace("/(tabs)/home");
-            } catch (error: any) {
+            } catch {
               setSaving(false);
               Alert.alert("Error", "No se pudo eliminar el grupo");
             }
@@ -111,16 +115,16 @@ export default function GroupSettingsScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
 
   if (!group || !isAdmin) {
     return (
-      <View style={styles.centerContainer}>
-        <Text>No tienes permisos para ver esta pantalla</Text>
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <Text variant="bodyLarge">No tienes permisos para ver esta pantalla</Text>
       </View>
     );
   }
@@ -128,7 +132,7 @@ export default function GroupSettingsScreen() {
   return (
     <>
       <Stack.Screen options={{ title: "Ajustes del Grupo" }} />
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -137,22 +141,27 @@ export default function GroupSettingsScreen() {
             style={styles.scrollView}
             contentContainerStyle={[
               styles.content,
-              { paddingBottom: theme.spacing.xl + insets.bottom }
+              { paddingBottom: appTheme.spacing.xl + insets.bottom }
             ]}
           >
             {/* General Info */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Información General</Text>
+              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 16 }}>
+                Información General
+              </Text>
               
               <View style={styles.iconSelector}>
-                <Text style={styles.label}>Icono</Text>
+                <Text variant="labelLarge" style={{ marginBottom: 8 }}>Icono</Text>
                 <View style={styles.iconGrid}>
                   {predefinedIcons.map((item) => (
                     <TouchableOpacity
                       key={item}
                       style={[
                         styles.iconOption,
-                        icon === item && styles.iconOptionSelected
+                        { 
+                          backgroundColor: icon === item ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                          borderColor: icon === item ? theme.colors.primary : 'transparent'
+                        }
                       ]}
                       onPress={() => setIcon(item)}
                     >
@@ -162,93 +171,107 @@ export default function GroupSettingsScreen() {
                 </View>
               </View>
 
-              <Input
+              <TextInput
                 label="Nombre del Grupo"
                 value={name}
                 onChangeText={setName}
-                placeholder="Nombre del grupo"
+                mode="outlined"
+                style={styles.input}
               />
 
-              <Input
+              <TextInput
                 label="Descripción"
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Descripción corta"
+                mode="outlined"
                 multiline
                 numberOfLines={3}
+                style={styles.input}
               />
             </View>
 
             {/* Permissions / Settings */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Permisos y Configuración</Text>
+              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 16 }}>
+                Permisos y Configuración
+              </Text>
               
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Permitir nominaciones de miembros</Text>
-                  <Text style={styles.settingDescription}>
-                    Los miembros pueden nominar a otros para premios
-                  </Text>
-                </View>
-                <Switch
-                  value={allowMemberNominations}
-                  onValueChange={setAllowMemberNominations}
-                  trackColor={{ false: Colors.border, true: Colors.primary }}
-                />
-              </View>
+              <Card mode="outlined" style={{ marginBottom: 8 }}>
+                <Card.Content style={styles.settingRow}>
+                  <View style={styles.settingInfo}>
+                    <Text variant="bodyLarge">Permitir nominaciones de miembros</Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                      Los miembros pueden nominar a otros para premios
+                    </Text>
+                  </View>
+                  <Switch
+                    value={allowMemberNominations}
+                    onValueChange={setAllowMemberNominations}
+                  />
+                </Card.Content>
+              </Card>
 
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Permitir votación de miembros</Text>
-                  <Text style={styles.settingDescription}>
-                    Los miembros pueden votar en los premios activos
-                  </Text>
-                </View>
-                <Switch
-                  value={allowMemberVoting}
-                  onValueChange={setAllowMemberVoting}
-                  trackColor={{ false: Colors.border, true: Colors.primary }}
-                />
-              </View>
+              <Card mode="outlined" style={{ marginBottom: 8 }}>
+                <Card.Content style={styles.settingRow}>
+                  <View style={styles.settingInfo}>
+                    <Text variant="bodyLarge">Permitir votación de miembros</Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                      Los miembros pueden votar en los premios activos
+                    </Text>
+                  </View>
+                  <Switch
+                    value={allowMemberVoting}
+                    onValueChange={setAllowMemberVoting}
+                  />
+                </Card.Content>
+              </Card>
 
-              <View style={styles.settingRow}>
-                <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel}>Requerir aprobación</Text>
-                  <Text style={styles.settingDescription}>
-                    Los nuevos miembros deben ser aprobados por un admin
-                  </Text>
-                </View>
-                <Switch
-                  value={requireApproval}
-                  onValueChange={setRequireApproval}
-                  trackColor={{ false: Colors.border, true: Colors.primary }}
-                />
-              </View>
+              <Card mode="outlined">
+                <Card.Content style={styles.settingRow}>
+                  <View style={styles.settingInfo}>
+                    <Text variant="bodyLarge">Requerir aprobación</Text>
+                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                      Los nuevos miembros deben ser aprobados por un admin
+                    </Text>
+                  </View>
+                  <Switch
+                    value={requireApproval}
+                    onValueChange={setRequireApproval}
+                  />
+                </Card.Content>
+              </Card>
             </View>
 
             {/* Danger Zone */}
             {isOwner && (
-              <View style={styles.dangerSection}>
-                <Text style={styles.dangerTitle}>Zona de Peligro</Text>
-                <Button
-                  title="Eliminar Grupo"
-                  onPress={handleDelete}
-                  variant="ghost"
-                  textStyle={{ color: Colors.error }}
-                  style={styles.deleteButton}
-                  loading={saving}
-                />
-              </View>
+              <Card mode="outlined" style={[styles.dangerSection, { borderColor: theme.colors.error }]}>
+                <Card.Content>
+                  <Text variant="titleMedium" style={{ color: theme.colors.error, marginBottom: 12 }}>
+                    Zona de Peligro
+                  </Text>
+                  <Button
+                    mode="outlined"
+                    onPress={handleDelete}
+                    loading={saving}
+                    textColor={theme.colors.error}
+                    style={{ borderColor: theme.colors.error }}
+                  >
+                    Eliminar Grupo
+                  </Button>
+                </Card.Content>
+              </Card>
             )}
 
           </ScrollView>
 
-          <View style={[styles.footer, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+          <View style={[styles.footer, { paddingBottom: appTheme.spacing.lg + insets.bottom, backgroundColor: theme.colors.surface }]}>
             <Button
-              title="Guardar Cambios"
+              mode="contained"
               onPress={handleSave}
               loading={saving}
-            />
+            >
+              Guardar Cambios
+            </Button>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -259,13 +282,11 @@ export default function GroupSettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   centerContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -274,25 +295,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   section: {
-    marginBottom: theme.spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: Colors.text,
-    marginBottom: 8,
+    marginBottom: appTheme.spacing.xl,
   },
   iconSelector: {
-    marginBottom: theme.spacing.md,
+    marginBottom: appTheme.spacing.md,
   },
   iconGrid: {
     flexDirection: "row",
@@ -303,61 +312,31 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "transparent",
-  },
-  iconOptionSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.backgroundLight,
   },
   iconText: {
     fontSize: 24,
+  },
+  input: {
+    marginBottom: appTheme.spacing.md,
   },
   settingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
   },
   settingInfo: {
     flex: 1,
-    paddingRight: theme.spacing.md,
-  },
-  settingLabel: {
-    fontSize: 16,
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  settingDescription: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+    paddingRight: appTheme.spacing.md,
   },
   dangerSection: {
-    marginTop: theme.spacing.xl,
-    padding: theme.spacing.md,
-    backgroundColor: 'rgba(255, 59, 48, 0.05)',
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 59, 48, 0.2)',
-  },
-  dangerTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.error,
-    marginBottom: theme.spacing.md,
-  },
-  deleteButton: {
-    borderColor: Colors.error,
+    marginTop: appTheme.spacing.xl,
   },
   footer: {
-    padding: theme.spacing.lg,
-    backgroundColor: Colors.background,
+    padding: appTheme.spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: 'rgba(0,0,0,0.1)',
   },
 });

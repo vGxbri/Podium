@@ -1,19 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
+import { useTheme } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Colors } from "../../constants/Colors";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textLight,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.onSurfaceVariant,
         tabBarStyle: {
-          backgroundColor: Colors.surface,
-          borderTopColor: Colors.border,
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.outlineVariant,
           paddingTop: 8,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           height: 60 + (insets.bottom > 0 ? insets.bottom : 0),
@@ -24,19 +25,19 @@ export default function TabLayout() {
           marginBottom: insets.bottom > 0 ? 0 : 8,
         },
         headerStyle: {
-          backgroundColor: Colors.background,
+          backgroundColor: theme.colors.surface,
         },
-        headerTintColor: Colors.primary,
+        headerTintColor: theme.colors.onSurface,
         headerTitleStyle: {
           fontWeight: "700",
-          fontSize: 24,
+          fontSize: 22,
         },
       }}
     >
       <Tabs.Screen
         name="home"
         options={{
-          title: "Inicio",
+          title: "",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
@@ -46,7 +47,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Perfil",
+          title: "",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
@@ -62,3 +63,4 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+

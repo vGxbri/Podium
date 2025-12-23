@@ -1,19 +1,24 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
+import {
+    Button,
+    Card,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
+} from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Button } from "../../../../components/ui/Button";
-import { Input } from "../../../../components/ui/Input";
-import { Colors } from "../../../../constants/Colors";
-import { theme } from "../../../../constants/theme";
+import { theme as appTheme } from "../../../../constants/theme";
 import { groupsService } from "../../../../services";
 
 const groupIcons = ["🏆", "🎉", "⭐", "🎄", "🎯", "🔥", "💎", "🎭"];
@@ -21,18 +26,17 @@ const groupIcons = ["🏆", "🎉", "⭐", "🎄", "🎯", "🔥", "💎", "🎭
 export default function CreateGroupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const theme = useTheme();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIcon, setSelectedIcon] = useState("🏆");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleCreate = async () => {
     if (!name.trim()) return;
 
     try {
       setLoading(true);
-      setError(null);
       
       const newGroup = await groupsService.createGroup({
         name: name.trim(),
@@ -40,7 +44,6 @@ export default function CreateGroupScreen() {
         icon: selectedIcon,
       });
       
-      // Navigate to the newly created group
       router.replace({
         pathname: "/home/group/[id]",
         params: { id: newGroup.id }
@@ -48,7 +51,6 @@ export default function CreateGroupScreen() {
     } catch (err) {
       console.error("Error creating group:", err);
       const message = err instanceof Error ? err.message : "Error al crear el grupo";
-      setError(message);
       Alert.alert("Error", message);
     } finally {
       setLoading(false);
@@ -56,7 +58,7 @@ export default function CreateGroupScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -68,64 +70,71 @@ export default function CreateGroupScreen() {
         >
           {/* Icon Selector */}
           <View style={styles.section}>
-            <Text style={styles.label}>Icono del grupo</Text>
+            <Text variant="labelLarge" style={{ marginBottom: 12 }}>
+              Icono del grupo
+            </Text>
             <View style={styles.iconGrid}>
               {groupIcons.map((icon) => (
-                <View
+                <TouchableOpacity
                   key={icon}
                   style={[
                     styles.iconButton,
-                    selectedIcon === icon && styles.iconButtonSelected,
+                    { 
+                      backgroundColor: selectedIcon === icon ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                      borderColor: selectedIcon === icon ? theme.colors.primary : 'transparent'
+                    },
                   ]}
+                  onPress={() => setSelectedIcon(icon)}
                 >
-                  <Text
-                    style={styles.iconText}
-                    onPress={() => setSelectedIcon(icon)}
-                  >
-                    {icon}
-                  </Text>
-                </View>
+                  <Text style={styles.iconText}>{icon}</Text>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
 
           {/* Group Name */}
-          <Input
+          <TextInput
             label="Nombre del grupo"
             placeholder="ej. Los Cracks"
             value={name}
             onChangeText={setName}
-            autoCapitalize="words"
+            mode="outlined"
+            style={styles.input}
           />
 
           {/* Description */}
-          <Input
+          <TextInput
             label="Descripción (opcional)"
             placeholder="Describe tu grupo..."
             value={description}
             onChangeText={setDescription}
+            mode="outlined"
             multiline
             numberOfLines={3}
-            style={styles.textArea}
+            style={styles.input}
           />
 
           {/* Info */}
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              🎉 Serás administrador del grupo automáticamente
-            </Text>
-          </View>
+          <Card mode="outlined" style={styles.infoBox}>
+            <Card.Content>
+              <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
+                🎉 Serás administrador del grupo automáticamente
+              </Text>
+            </Card.Content>
+          </Card>
         </ScrollView>
 
         {/* Submit Button */}
-        <View style={[styles.footer, { paddingBottom: theme.spacing.lg + insets.bottom }]}>
+        <Surface style={[styles.footer, { paddingBottom: appTheme.spacing.lg + insets.bottom, backgroundColor: theme.colors.surface }]} elevation={1}>
           <Button
-            title="Crear Grupo"
+            mode="contained"
             onPress={handleCreate}
             loading={loading}
             disabled={!name.trim()}
-          />
-        </View>
+          >
+            Crear Grupo
+          </Button>
+        </Surface>
       </KeyboardAvoidingView>
     </View>
   );
@@ -134,7 +143,6 @@ export default function CreateGroupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -143,59 +151,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   section: {
-    marginBottom: theme.spacing.lg,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 12,
+    marginBottom: appTheme.spacing.lg,
   },
   iconGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: theme.spacing.sm,
+    gap: appTheme.spacing.sm,
   },
   iconButton: {
     width: 52,
     height: 52,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: Colors.surface,
+    borderRadius: appTheme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "transparent",
-  },
-  iconButtonSelected: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.backgroundLight,
   },
   iconText: {
     fontSize: 28,
   },
-  textArea: {
-    height: 80,
-    textAlignVertical: "top",
+  input: {
+    marginBottom: appTheme.spacing.md,
   },
   infoBox: {
-    backgroundColor: Colors.backgroundLight,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
-    marginTop: theme.spacing.md,
-  },
-  infoText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center",
+    marginTop: appTheme.spacing.md,
   },
   footer: {
-    padding: theme.spacing.lg,
-    paddingTop: theme.spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.background,
+    padding: appTheme.spacing.lg,
+    paddingTop: appTheme.spacing.md,
   },
 });

@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Colors } from '../constants/Colors';
-import { theme } from '../constants/theme';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Card, Surface, Text, useTheme } from 'react-native-paper';
+import { theme as appTheme } from '../constants/theme';
 import { GroupWithDetails } from '../types/database';
-import { Card } from './ui/Card';
 
 interface GroupCardProps {
   group: GroupWithDetails;
@@ -12,33 +11,40 @@ interface GroupCardProps {
 }
 
 export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
+  const theme = useTheme();
   const awardCount = group.awards?.length || 0;
   
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      <Card variant="elevated" padding="md" style={styles.card}>
-        <View style={styles.row}>
-          <View style={styles.iconContainer}>
+      <Card mode="elevated" style={styles.card}>
+        <Card.Content style={styles.row}>
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
             <Text style={styles.icon}>{group.icon || '🏆'}</Text>
-          </View>
+          </Surface>
           
           <View style={styles.content}>
-            <Text style={styles.title}>{group.name}</Text>
+            <Text variant="titleMedium" style={{ fontWeight: '600' }}>
+              {group.name}
+            </Text>
             <View style={styles.metaRow}>
-              <Ionicons name="people" size={14} color={Colors.textSecondary} />
-              <Text style={styles.members}>{group.member_count} miembros</Text>
+              <Ionicons name="people" size={14} color={theme.colors.onSurfaceVariant} />
+              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                {group.member_count} miembros
+              </Text>
               {awardCount > 0 && (
                 <>
-                  <View style={styles.dot} />
-                  <Ionicons name="trophy" size={14} color={Colors.gold} />
-                  <Text style={styles.awards}>{awardCount} premios</Text>
+                  <View style={[styles.dot, { backgroundColor: theme.colors.outline }]} />
+                  <Ionicons name="trophy" size={14} color="#FFD700" />
+                  <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                    {awardCount} premios
+                  </Text>
                 </>
               )}
             </View>
           </View>
           
-          <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
-        </View>
+          <Ionicons name="chevron-forward" size={20} color={theme.colors.onSurfaceVariant} />
+        </Card.Content>
       </Card>
     </TouchableOpacity>
   );
@@ -46,7 +52,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: theme.spacing.sm,
+    marginBottom: appTheme.spacing.sm,
   },
   row: {
     flexDirection: 'row',
@@ -55,11 +61,10 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 48,
     height: 48,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: Colors.backgroundLight,
+    borderRadius: appTheme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: theme.spacing.md,
+    marginRight: appTheme.spacing.md,
   },
   icon: {
     fontSize: 24,
@@ -67,30 +72,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 4,
-  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  members: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    marginTop: 2,
   },
   dot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: Colors.textLight,
     marginHorizontal: 6,
-  },
-  awards: {
-    fontSize: 13,
-    color: Colors.textSecondary,
   },
 });

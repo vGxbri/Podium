@@ -2,18 +2,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    View
 } from "react-native";
+import {
+    ActivityIndicator,
+    Button,
+    Card,
+    FAB,
+    Surface,
+    Text,
+    useTheme
+} from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupCard } from "../../../components/GroupCard";
-import { Colors } from "../../../constants/Colors";
-import { theme } from "../../../constants/theme";
+import { theme as appTheme } from "../../../constants/theme";
 import { useAuth, useGroups } from "../../../hooks";
 
 export default function HomeScreen() {
@@ -21,6 +26,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const { groups, isLoading, error, refetch } = useGroups();
+  const theme = useTheme();
 
   const handleGroupPress = (groupId: string) => {
     router.push({
@@ -45,7 +51,7 @@ export default function HomeScreen() {
   const displayName = profile?.display_name?.split(' ')[0] || 'Usuario';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -57,87 +63,107 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={refetch}
-            colors={[Colors.primary]}
-            tintColor={Colors.primary}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
         }
       >
         {/* Header Section */}
         <View style={styles.header}>
-          <Text style={styles.greeting}>¡Hola, {displayName}! 👋</Text>
-          <Text style={styles.subtitle}>
+          <Text variant="headlineMedium" style={{ fontWeight: "700" }}>
+            ¡Hola, {displayName}! 👋
+          </Text>
+          <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant }}>
             Gestiona tus grupos y premios
           </Text>
         </View>
 
         {/* Quick Stats */}
         <View style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{totalGroups}</Text>
-            <Text style={styles.statLabel}>Grupos</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{totalAwards}</Text>
-            <Text style={styles.statLabel}>Premios</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{totalMembers}</Text>
-            <Text style={styles.statLabel}>Amigos</Text>
-          </View>
+          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
+            <Text variant="headlineSmall" style={{ color: theme.colors.primary, fontWeight: "700" }}>
+              {totalGroups}
+            </Text>
+            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              Grupos
+            </Text>
+          </Surface>
+          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
+            <Text variant="headlineSmall" style={{ color: theme.colors.primary, fontWeight: "700" }}>
+              {totalAwards}
+            </Text>
+            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              Premios
+            </Text>
+          </Surface>
+          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
+            <Text variant="headlineSmall" style={{ color: theme.colors.primary, fontWeight: "700" }}>
+              {totalMembers}
+            </Text>
+            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              Amigos
+            </Text>
+          </Surface>
         </View>
 
         {/* Error State */}
         {error && (
-          <View style={styles.errorState}>
-            <Ionicons name="warning-outline" size={24} color={Colors.error} />
-            <Text style={styles.errorText}>Error al cargar grupos</Text>
-            <TouchableOpacity onPress={refetch}>
-              <Text style={styles.retryText}>Reintentar</Text>
-            </TouchableOpacity>
-          </View>
+          <Card style={styles.errorCard} mode="outlined">
+            <Card.Content style={styles.errorContent}>
+              <Ionicons name="warning-outline" size={24} color={theme.colors.error} />
+              <Text variant="bodyMedium" style={{ color: theme.colors.error, marginTop: 8 }}>
+                Error al cargar grupos
+              </Text>
+              <Button mode="text" onPress={refetch} style={{ marginTop: 8 }}>
+                Reintentar
+              </Button>
+            </Card.Content>
+          </Card>
         )}
 
         {/* Groups Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Mis Grupos</Text>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <TouchableOpacity onPress={handleJoinGroup}>
-                <Text style={styles.sectionAction}>Unirse</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleCreateGroup}>
-                <Text style={styles.sectionAction}>+ Nuevo</Text>
-              </TouchableOpacity>
+            <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+              Mis Grupos
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Button mode="text" compact onPress={handleJoinGroup}>
+                Unirse
+              </Button>
+              <Button mode="text" compact onPress={handleCreateGroup}>
+                + Nuevo
+              </Button>
             </View>
           </View>
 
           {isLoading && groups.length === 0 ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-              <Text style={styles.loadingText}>Cargando grupos...</Text>
+              <ActivityIndicator size="large" />
+              <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
+                Cargando grupos...
+              </Text>
             </View>
           ) : groups.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color={Colors.textLight} />
-              <Text style={styles.emptyText}>No tienes grupos aún</Text>
-              <Text style={styles.emptySubtext}>
-                Crea tu primer grupo o únete a uno existente
-              </Text>
-              <View style={styles.emptyButtons}>
-                <TouchableOpacity 
-                  style={styles.createButton} 
-                  onPress={handleCreateGroup}
-                >
-                  <Text style={styles.createButtonText}>Crear Grupo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.createButton, styles.joinButton]} 
-                  onPress={handleJoinGroup}
-                >
-                  <Text style={[styles.createButtonText, styles.joinButtonText]}>Unirse con código</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            <Card style={styles.emptyCard} mode="elevated">
+              <Card.Content style={styles.emptyContent}>
+                <Ionicons name="people-outline" size={48} color={theme.colors.onSurfaceVariant} />
+                <Text variant="titleMedium" style={{ marginTop: 16 }}>
+                  No tienes grupos aún
+                </Text>
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: "center" }}>
+                  Crea tu primer grupo o únete a uno existente
+                </Text>
+                <View style={styles.emptyButtons}>
+                  <Button mode="contained" onPress={handleCreateGroup}>
+                    Crear Grupo
+                  </Button>
+                  <Button mode="outlined" onPress={handleJoinGroup}>
+                    Unirse con código
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
           ) : (
             groups.map((group) => (
               <GroupCard
@@ -152,13 +178,11 @@ export default function HomeScreen() {
 
       {/* FAB */}
       {groups.length > 0 && (
-        <TouchableOpacity
+        <FAB
+          icon="plus"
           style={[styles.fab, { bottom: 24 + insets.bottom }]}
           onPress={handleCreateGroup}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={28} color={Colors.textOnPrimary} />
-        </TouchableOpacity>
+        />
       )}
     </View>
   );
@@ -167,143 +191,62 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   header: {
-    marginBottom: theme.spacing.lg,
-  },
-  greeting: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
+    marginBottom: appTheme.spacing.lg,
+    gap: 4,
   },
   statsRow: {
     flexDirection: "row",
-    gap: theme.spacing.sm,
-    marginBottom: theme.spacing.xl,
+    gap: appTheme.spacing.sm,
+    marginBottom: appTheme.spacing.xl,
   },
   statCard: {
     flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    padding: theme.spacing.md,
+    borderRadius: appTheme.borderRadius.lg,
+    padding: appTheme.spacing.md,
     alignItems: "center",
-    ...theme.shadows.sm,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: Colors.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
   },
   section: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: appTheme.spacing.xl,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.md,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.text,
-  },
-  sectionAction: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: "600",
+    marginBottom: appTheme.spacing.md,
   },
   loadingState: {
     alignItems: "center",
-    padding: theme.spacing.xl,
+    padding: appTheme.spacing.xl,
   },
-  loadingText: {
-    marginTop: theme.spacing.md,
-    color: Colors.textSecondary,
+  errorCard: {
+    marginBottom: appTheme.spacing.lg,
   },
-  errorState: {
+  errorContent: {
     alignItems: "center",
-    padding: theme.spacing.lg,
-    backgroundColor: Colors.surface,
-    borderRadius: theme.borderRadius.lg,
-    marginBottom: theme.spacing.lg,
   },
-  errorText: {
-    marginTop: theme.spacing.sm,
-    color: Colors.error,
+  emptyCard: {
+    borderRadius: appTheme.borderRadius.lg,
   },
-  retryText: {
-    marginTop: theme.spacing.sm,
-    color: Colors.primary,
-    fontWeight: "600",
-  },
-  emptyState: {
+  emptyContent: {
     alignItems: "center",
-    padding: theme.spacing.xl,
-    backgroundColor: Colors.surface,
-    borderRadius: theme.borderRadius.lg,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.text,
-    marginTop: theme.spacing.md,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    marginBottom: theme.spacing.lg,
-  },
-  createButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-  },
-  createButtonText: {
-    color: Colors.textOnPrimary,
-    fontWeight: "600",
-    fontSize: 16,
+    paddingVertical: appTheme.spacing.xl,
   },
   emptyButtons: {
     flexDirection: "row",
-    gap: theme.spacing.md,
-  },
-  joinButton: {
-    backgroundColor: "transparent",
-    borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  joinButtonText: {
-    color: Colors.primary,
+    gap: appTheme.spacing.md,
+    marginTop: appTheme.spacing.lg,
   },
   fab: {
     position: "absolute",
     right: 24,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    ...theme.shadows.lg,
   },
 });
+

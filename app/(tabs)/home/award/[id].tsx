@@ -2,26 +2,29 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
     Alert,
     Modal,
     ScrollView,
     StyleSheet,
-    Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
+import {
+    ActivityIndicator,
+    Button,
+    Card,
+    Chip,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
+} from "react-native-paper";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
-import { Button } from "../../../../components/ui/Button";
-import { Card } from "../../../../components/ui/Card";
-import { Colors } from "../../../../constants/Colors";
-import { theme } from "../../../../constants/theme";
+import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
 import { AwardWithNominees } from "../../../../types/database";
 
-// Utility to format date
 const formatDate = (dateString: string) => {
   if (!dateString) return "";
   return new Date(dateString).toLocaleString("es-ES", {
@@ -35,6 +38,7 @@ const formatDate = (dateString: string) => {
 export default function AwardDetailScreen() {
   const { id, groupId } = useLocalSearchParams<{ id: string; groupId: string }>();
   const router = useRouter();
+  const theme = useTheme();
   
   const { isAdmin } = useGroup(groupId);
   
@@ -42,10 +46,8 @@ export default function AwardDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   
-  // Voting State
   const [myVote, setMyVote] = useState<string | null>(null);
   
-  // Start Voting Modal State
   const [showStartVotingModal, setShowStartVotingModal] = useState(false);
   const [deadlineMode, setDeadlineMode] = useState<'24h' | '48h' | '1w' | 'custom'>('24h');
   const [customDate, setCustomDate] = useState("");
@@ -87,7 +89,6 @@ export default function AwardDetailScreen() {
       } else if (deadlineMode === '1w') {
         deadlineDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
       } else if (deadlineMode === 'custom') {
-        // Parse custom date DD/MM/YYYY HH:MM
         const [datePart, timePart] = [customDate, customTime];
         const [day, month, year] = datePart.split('/').map(Number);
         const [hour, minute] = timePart.split(':').map(Number);
@@ -106,14 +107,10 @@ export default function AwardDetailScreen() {
       }
 
       setActionLoading(true);
-      await awardsService.updateAwardStatus(
-        award.id, 
-        'voting', 
-        deadlineDate?.toISOString()
-      );
+      await awardsService.updateAwardStatus(award.id, 'voting', deadlineDate?.toISOString());
       
       setShowStartVotingModal(false);
-      fetchAward(); // Refresh
+      fetchAward();
       
     } catch {
       Alert.alert("Error", "No se pudo iniciar la votación");
@@ -130,7 +127,7 @@ export default function AwardDetailScreen() {
       await awardsService.vote(award.id, nomineeId);
       setMyVote(nomineeId);
       Alert.alert("Éxito", "Tu voto ha sido registrado");
-      fetchAward(); // Refresh counts if needed, though usually hidden
+      fetchAward();
     } catch (error: any) {
       Alert.alert("Error", error.message || "No se pudo registrar el voto");
     } finally {
@@ -152,8 +149,6 @@ export default function AwardDetailScreen() {
           onPress: async () => {
             try {
               setActionLoading(true);
-              // First verify we have votes? Logic inside declareWinner handles it?
-              // Assuming declareWinner changes status to 'completed'
               await awardsService.declareWinner(award.id);
               fetchAward();
             } catch (error: any) {
@@ -166,8 +161,6 @@ export default function AwardDetailScreen() {
       ]
     );
   };
-
-
 
   const handleRevealWinner = async () => {
     if (!award) return;
@@ -222,97 +215,101 @@ export default function AwardDetailScreen() {
   
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
 
   if (!award) {
     return (
-      <View style={styles.centerContainer}>
-        <Text>Premio no encontrado</Text>
+      <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
+        <Text variant="bodyLarge">Premio no encontrado</Text>
       </View>
     );
   }
 
-  // const isNominee = award.nominees.some(n => n.user_id === group?.my_role /* wait, need user id */); 
-  // We don't have user ID easily here in hooks, but service checks it. 
-  // We can try to guess from 'my_role' but better to catch error from service 
-  // or use supabase.auth.getUser() in effect if we want to disable button UI.
-  // For now rely on service error.
+  const getStatusConfig = () => {
+    switch (award.status) {
+      case 'voting':
+        return { label: 'Votación en curso', color: '#F59E0B', bg: 'rgba(255, 159, 10, 0.15)' };
+      case 'completed':
+        return { label: 'Finalizado', color: theme.colors.primary, bg: 'rgba(50, 215, 75, 0.15)' };
+      default:
+        return { label: 'Borrador', color: theme.colors.onSurfaceVariant, bg: theme.colors.surfaceVariant };
+    }
+  };
+
+  const statusConfig = getStatusConfig();
 
   return (
     <>
       <Stack.Screen options={{ title: "Detalles del Premio" }} />
-      <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.iconContainer}>
+      <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        {/* Header */}
+        <Surface style={[styles.header, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surface }]} elevation={2}>
             <Text style={styles.icon}>{award.icon}</Text>
-          </View>
-          <Text style={styles.title}>{award.name}</Text>
+          </Surface>
+          <Text variant="headlineSmall" style={{ fontWeight: "bold", textAlign: "center", marginBottom: 8 }}>
+            {award.name}
+          </Text>
           {award.description && (
-            <Text style={styles.description}>{award.description}</Text>
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", marginBottom: 12 }}>
+              {award.description}
+            </Text>
           )}
           
-          <View style={[
-            styles.statusBadge, 
-            award.status === 'voting' && styles.statusBadgeVoting,
-            award.status === 'completed' && styles.statusBadgeCompleted
-          ]}>
-            <Text style={[
-              styles.statusText,
-              award.status === 'voting' && styles.statusTextVoting,
-              award.status === 'completed' && styles.statusTextCompleted
-            ]}>
-              {award.status === 'draft' && "Borrador"}
-              {award.status === 'voting' && "Votación en curso"}
-              {award.status === 'completed' && "Finalizado"}
-            </Text>
-          </View>
+          <Chip style={{ backgroundColor: statusConfig.bg }}>
+            <Text style={{ color: statusConfig.color, fontWeight: "600" }}>{statusConfig.label}</Text>
+          </Chip>
 
           {award.status === 'voting' && award.voting_ends_at && (
-            <Text style={styles.deadlineText}>
+            <Text variant="labelMedium" style={{ color: theme.colors.error, marginTop: 8 }}>
               Termina: {formatDate(award.voting_ends_at)}
             </Text>
           )}
 
           {award.status === 'completed' && (
-             <Text style={styles.winnerTextHeader}>
-               {award.is_revealed 
-                 ? "¡Ganador revelado!" 
-                 : "La votación ha finalizado. Ganador pendiente de revelar."}
-             </Text>
+            <Text variant="bodyMedium" style={{ color: theme.colors.primary, fontWeight: "600", marginTop: 8 }}>
+              {award.is_revealed ? "¡Ganador revelado!" : "Ganador pendiente de revelar."}
+            </Text>
           )}
-        </View>
+        </Surface>
 
+        {/* Nominees Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nominados ({award.nominees.length})</Text>
+          <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+            Nominados ({award.nominees.length})
+          </Text>
           
           <View style={styles.nomineesList}>
             {award.nominees.map((nominee) => (
-              <Card key={nominee.id} variant="glass" padding="sm" style={styles.nomineeCard}>
-                <View style={styles.nomineeRow}>
+              <Card key={nominee.id} mode="outlined" style={styles.nomineeCard}>
+                <Card.Content style={styles.nomineeRow}>
                   <MemberAvatar user={nominee.user} size="md" />
                   <View style={styles.nomineeInfo}>
-                    <Text style={styles.nomineeName}>{nominee.user.display_name}</Text>
+                    <Text variant="bodyLarge" style={{ fontWeight: "500" }}>
+                      {nominee.user.display_name}
+                    </Text>
                     {award.status === 'completed' && nominee.is_winner && award.is_revealed && (
-                       <View style={styles.winnerBadge}>
-                         <Text style={styles.winnerText}>🏆 Ganador</Text>
-                       </View>
+                      <Chip compact style={{ backgroundColor: '#FFD700', marginTop: 4 }}>
+                        <Text style={{ fontSize: 11 }}>🏆 Ganador</Text>
+                      </Chip>
                     )}
                   </View>
                   
                   {award.status === 'voting' && (
-                    <Button 
-                      title={myVote === nominee.id ? "Votado" : "Votar"}
-                      size="sm"
-                      variant={myVote === nominee.id ? "primary" : "secondary"}
+                    <Button
+                      mode={myVote === nominee.id ? "contained" : "outlined"}
+                      compact
                       disabled={!!myVote || actionLoading}
                       onPress={() => handleVote(nominee.id)}
-                    />
+                    >
+                      {myVote === nominee.id ? "Votado" : "Votar"}
+                    </Button>
                   )}
-                </View>
+                </Card.Content>
               </Card>
             ))}
           </View>
@@ -320,45 +317,40 @@ export default function AwardDetailScreen() {
 
         {/* Admin Actions */}
         {isAdmin && (
-          <View style={styles.adminSection}>
-            <Text style={styles.adminTitle}>Administración</Text>
-            
-            {award.status === 'draft' && (
-              <Button 
-                title="Iniciar Votación"
-                onPress={() => setShowStartVotingModal(true)}
-                loading={actionLoading}
-              />
-            )}
-            
-            {award.status === 'voting' && (
-              <Button 
-                title="Finalizar Votación Ahora"
-                variant="secondary"
-                onPress={handleFinishVoting}
-                loading={actionLoading}
-                style={{ marginBottom: 10 }}
-              />
-            )}
+          <Card mode="outlined" style={styles.adminSection}>
+            <Card.Content>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12, textTransform: "uppercase" }}>
+                Administración
+              </Text>
+              
+              {award.status === 'draft' && (
+                <Button mode="contained" onPress={() => setShowStartVotingModal(true)} loading={actionLoading}>
+                  Iniciar Votación
+                </Button>
+              )}
+              
+              {award.status === 'voting' && (
+                <Button mode="outlined" onPress={handleFinishVoting} loading={actionLoading} style={{ marginBottom: 10 }}>
+                  Finalizar Votación Ahora
+                </Button>
+              )}
 
-            {award.status === 'completed' && !award.is_revealed && (
+              {award.status === 'completed' && !award.is_revealed && (
+                <Button mode="contained" onPress={handleRevealWinner} loading={actionLoading} style={{ marginBottom: 10 }}>
+                  Revelar Ganador
+                </Button>
+              )}
+              
               <Button 
-                title="Revelar Ganador"
-                onPress={handleRevealWinner}
-                loading={actionLoading}
-                style={{ marginBottom: 10 }}
-                variant="primary"
-              />
-            )}
-            
-            <Button 
-              title="Eliminar Premio"
-              variant="ghost"
-              onPress={handleDelete}
-              style={{ marginTop: 10 }}
-              textStyle={{ color: Colors.error }}
-            />
-          </View>
+                mode="text" 
+                onPress={handleDelete} 
+                textColor={theme.colors.error}
+                style={{ marginTop: 10 }}
+              >
+                Eliminar Premio
+              </Button>
+            </Card.Content>
+          </Card>
         )}
         
         <View style={{ height: 100 }} />
@@ -372,64 +364,67 @@ export default function AwardDetailScreen() {
         onRequestClose={() => setShowStartVotingModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Configurar Votación</Text>
-            <Text style={styles.modalSubtitle}>Elige cuándo termina la votación:</Text>
-            
-            <View style={styles.optionsContainer}>
-              {(['24h', '48h', '1w', 'custom'] as const).map((mode) => (
-                <TouchableOpacity
-                  key={mode}
-                  style={[
-                    styles.optionButton,
-                    deadlineMode === mode && styles.optionButtonSelected
-                  ]}
-                  onPress={() => setDeadlineMode(mode)}
-                >
-                  <Text style={[
-                    styles.optionText,
-                    deadlineMode === mode && styles.optionTextSelected
-                  ]}>
-                    {mode === '24h' && '24 Horas'}
-                    {mode === '48h' && '48 Horas'}
-                    {mode === '1w' && '1 Semana'}
-                    {mode === 'custom' && 'Personalizado'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            
-            {deadlineMode === 'custom' && (
-              <View style={styles.customDateContainer}>
-                <TextInput
-                  placeholder="DD/MM/YYYY"
-                  style={styles.input}
-                  value={customDate}
-                  onChangeText={setCustomDate}
-                />
-                <TextInput
-                  placeholder="HH:MM"
-                  style={styles.input}
-                  value={customTime}
-                  onChangeText={setCustomTime}
-                />
+          <Card style={styles.modalContent}>
+            <Card.Content>
+              <Text variant="titleLarge" style={{ textAlign: "center", marginBottom: 8 }}>
+                Configurar Votación
+              </Text>
+              <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                Elige cuándo termina la votación:
+              </Text>
+              
+              <View style={styles.optionsContainer}>
+                {(['24h', '48h', '1w', 'custom'] as const).map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[
+                      styles.optionButton,
+                      { 
+                        borderColor: deadlineMode === mode ? theme.colors.primary : theme.colors.outline,
+                        backgroundColor: deadlineMode === mode ? theme.colors.primaryContainer : 'transparent'
+                      }
+                    ]}
+                    onPress={() => setDeadlineMode(mode)}
+                  >
+                    <Text style={{ color: deadlineMode === mode ? theme.colors.primary : theme.colors.onSurface, fontWeight: "500" }}>
+                      {mode === '24h' && '24 Horas'}
+                      {mode === '48h' && '48 Horas'}
+                      {mode === '1w' && '1 Semana'}
+                      {mode === 'custom' && 'Personalizado'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
+              
+              {deadlineMode === 'custom' && (
+                <View style={styles.customDateContainer}>
+                  <TextInput
+                    label="DD/MM/YYYY"
+                    mode="outlined"
+                    value={customDate}
+                    onChangeText={setCustomDate}
+                    style={{ flex: 1, marginRight: 8 }}
+                  />
+                  <TextInput
+                    label="HH:MM"
+                    mode="outlined"
+                    value={customTime}
+                    onChangeText={setCustomTime}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              )}
 
-            <View style={styles.modalActions}>
-              <Button 
-                title="Cancelar" 
-                variant="ghost" 
-                onPress={() => setShowStartVotingModal(false)} 
-                style={{ flex: 1, marginRight: 8 }}
-              />
-              <Button 
-                title="Comenzar" 
-                onPress={handleStartVoting} 
-                style={{ flex: 1, marginLeft: 8 }}
-              />
-            </View>
-          </View>
+              <View style={styles.modalActions}>
+                <Button mode="text" onPress={() => setShowStartVotingModal(false)} style={{ flex: 1, marginRight: 8 }}>
+                  Cancelar
+                </Button>
+                <Button mode="contained" onPress={handleStartVoting} style={{ flex: 1, marginLeft: 8 }}>
+                  Comenzar
+                </Button>
+              </View>
+            </Card.Content>
+          </Card>
         </View>
       </Modal>
     </>
@@ -441,16 +436,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: Colors.background,
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   header: {
     alignItems: "center",
-    padding: theme.spacing.xl,
-    backgroundColor: Colors.backgroundLight,
+    padding: appTheme.spacing.xl,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
@@ -458,71 +450,18 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.surface,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: theme.spacing.md,
-    ...theme.shadows.md,
+    marginBottom: appTheme.spacing.md,
   },
   icon: {
     fontSize: 40,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: theme.spacing.sm,
-  },
-  description: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    marginBottom: theme.spacing.md,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: Colors.surface,
-    marginBottom: theme.spacing.sm,
-  },
-  statusBadgeVoting: {
-    backgroundColor: 'rgba(255, 159, 10, 0.15)',
-  },
-  statusBadgeCompleted: {
-    backgroundColor: 'rgba(50, 215, 75, 0.15)',
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-  },
-  statusTextVoting: {
-    color: Colors.warning,
-  },
-  statusTextCompleted: {
-    color: Colors.success,
-  },
-  deadlineText: {
-    fontSize: 14,
-    color: Colors.error,
-    fontWeight: "500",
-    marginTop: 4,
-  },
-
   section: {
-    padding: theme.spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: theme.spacing.md,
+    padding: appTheme.spacing.lg,
   },
   nomineesList: {
-    gap: theme.spacing.sm,
+    gap: appTheme.spacing.sm,
   },
   nomineeCard: {
     marginBottom: 4,
@@ -533,51 +472,20 @@ const styles = StyleSheet.create({
   },
   nomineeInfo: {
     flex: 1,
-    marginLeft: theme.spacing.md,
-  },
-  nomineeName: {
-    fontSize: 16,
-    color: Colors.text,
-    fontWeight: "500",
+    marginLeft: appTheme.spacing.md,
   },
   adminSection: {
-    padding: theme.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    margin: appTheme.spacing.lg,
+    marginTop: 0,
   },
-  adminTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-    marginBottom: theme.spacing.md,
-    textTransform: "uppercase",
-  },
-  
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   modalContent: {
-    backgroundColor: Colors.background,
     borderRadius: 20,
-    padding: theme.spacing.xl,
-    ...theme.shadows.lg,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: Colors.text,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 16,
-    textAlign: "center",
   },
   optionsContainer: {
     flexDirection: 'row',
@@ -592,53 +500,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.border,
     alignItems: 'center',
-  },
-  optionButtonSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  optionText: {
-    color: Colors.text,
-    fontWeight: "500",
-  },
-  optionTextSelected: {
-    color: Colors.textOnPrimary,
   },
   customDateContainer: {
     flexDirection: 'row',
-    gap: 10,
     marginBottom: 16,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    padding: 12,
-    borderRadius: 8,
-    color: Colors.text,
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  winnerBadge: {
-    backgroundColor: Colors.gold,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  winnerText: {
-    color: Colors.textOnPrimary,
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  winnerTextHeader: {
-    fontSize: 16,
-    color: Colors.success,
-    fontWeight: "600",
-    marginTop: 8,
-  },
 });
-

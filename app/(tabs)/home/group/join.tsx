@@ -5,17 +5,21 @@ import {
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
-    Text,
     View,
 } from "react-native";
+import {
+    Button,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "../../../../components/ui/Button";
-import { Input } from "../../../../components/ui/Input";
-import { Colors } from "../../../../constants/Colors";
-import { theme } from "../../../../constants/theme";
+import { theme as appTheme } from "../../../../constants/theme";
 
 export default function JoinGroupScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const [code, setCode] = useState("");
 
   const handleJoin = () => {
@@ -28,42 +32,48 @@ export default function JoinGroupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["bottom"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["bottom"]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.content}>
           {/* Icon */}
-          <View style={styles.iconContainer}>
-            <Ionicons name="ticket-outline" size={48} color={Colors.primary} />
-          </View>
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer }]} elevation={0}>
+            <Ionicons name="ticket-outline" size={48} color={theme.colors.primary} />
+          </Surface>
 
           {/* Title */}
-          <Text style={styles.title}>Unirse a un grupo</Text>
-          <Text style={styles.subtitle}>
+          <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
+            Unirse a un grupo
+          </Text>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", marginBottom: 32, maxWidth: 280 }}>
             Introduce el código de invitación que te han compartido
           </Text>
 
           {/* Code Input */}
-          <Input
+          <TextInput
             placeholder="Ej: ABC12345"
             value={code}
             onChangeText={(text: string) => setCode(text.toUpperCase())}
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={12}
+            mode="outlined"
             style={styles.input}
+            contentStyle={{ textAlign: "center", letterSpacing: 2 }}
           />
 
           {/* Join Button */}
           <Button
-            title="Unirse al grupo"
+            mode="contained"
             onPress={handleJoin}
             disabled={!code.trim()}
+            icon="login"
             style={styles.button}
-            icon={<Ionicons name="enter-outline" size={20} color={Colors.textOnPrimary} />}
-          />
+          >
+            Unirse al grupo
+          </Button>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -73,14 +83,13 @@ export default function JoinGroupScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
   },
   content: {
     flex: 1,
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -88,35 +97,17 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.backgroundLight,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: theme.spacing.lg,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: theme.spacing.sm,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    marginBottom: theme.spacing.xl,
-    maxWidth: 280,
+    marginBottom: appTheme.spacing.lg,
   },
   input: {
     width: "100%",
     maxWidth: 300,
-    textAlign: "center",
-    fontSize: 18,
-    letterSpacing: 2,
   },
   button: {
     width: "100%",
     maxWidth: 300,
-    marginTop: theme.spacing.lg,
+    marginTop: appTheme.spacing.lg,
   },
 });

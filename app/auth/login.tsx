@@ -6,19 +6,16 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { Button, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
-import { Colors } from "../../constants/Colors";
-import { theme } from "../../constants/theme";
+import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const { signIn } = useAuth();
   
   const [email, setEmail] = useState("");
@@ -34,7 +31,6 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       await signIn(email.trim(), password);
-      // Navigate to root - index.tsx will redirect to tabs/home
       router.replace("/");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al iniciar sesión";
@@ -45,7 +41,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -58,48 +54,56 @@ export default function LoginScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.logo}>🏆</Text>
-            <Text style={styles.title}>Podium</Text>
-            <Text style={styles.subtitle}>
+            <Text variant="displaySmall" style={{ fontWeight: "800", color: theme.colors.primary, letterSpacing: 1 }}>
+              Podium
+            </Text>
+            <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: "center" }}>
               Gestiona premios con tus amigos
             </Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            <Input
+            <TextInput
               label="Email"
               placeholder="tu@email.com"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              autoComplete="email"
+              mode="outlined"
+              style={styles.input}
             />
 
-            <Input
+            <TextInput
               label="Contraseña"
               placeholder="Tu contraseña"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              autoComplete="password"
+              mode="outlined"
+              style={styles.input}
             />
 
             <Button
-              title="Iniciar Sesión"
+              mode="contained"
               onPress={handleLogin}
               loading={loading}
               disabled={!email.trim() || !password}
               style={styles.button}
-            />
+            >
+              Iniciar Sesión
+            </Button>
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>¿No tienes cuenta?</Text>
-            <TouchableOpacity onPress={() => router.push("/auth/register")}>
-              <Text style={styles.footerLink}> Regístrate</Text>
-            </TouchableOpacity>
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              ¿No tienes cuenta?
+            </Text>
+            <Button mode="text" compact onPress={() => router.push("/auth/register")}>
+              Regístrate
+            </Button>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -110,7 +114,6 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -120,47 +123,29 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
     justifyContent: "center",
   },
   header: {
     alignItems: "center",
-    marginBottom: theme.spacing.xl * 2,
+    marginBottom: appTheme.spacing.xl * 2,
   },
   logo: {
     fontSize: 64,
-    marginBottom: theme.spacing.md,
-  },
-  title: {
-    fontSize: 36,
-    fontWeight: "800",
-    color: Colors.primary,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    marginTop: theme.spacing.sm,
-    textAlign: "center",
+    marginBottom: appTheme.spacing.md,
   },
   form: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: appTheme.spacing.xl,
+  },
+  input: {
+    marginBottom: appTheme.spacing.md,
   },
   button: {
-    marginTop: theme.spacing.md,
+    marginTop: appTheme.spacing.md,
   },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-  },
-  footerText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  footerLink: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: "600",
   },
 });

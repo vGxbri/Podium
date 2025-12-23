@@ -1,17 +1,26 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import {
+    ActivityIndicator,
+    Button,
+    Card,
+    Divider,
+    List,
+    Surface,
+
+    Text,
+    useTheme,
+} from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MemberAvatar } from "../../components/MemberAvatar";
-import { Button } from "../../components/ui/Button";
-import { Card } from "../../components/ui/Card";
-import { Colors } from "../../constants/Colors";
-import { theme } from "../../constants/theme";
+import { theme as appTheme } from "../../constants/theme";
 import { useAuth, useGroups } from "../../hooks";
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const { profile, isLoading: authLoading, signOut, isAuthenticated } = useAuth();
   const { groups, isLoading: groupsLoading } = useGroups();
 
@@ -43,9 +52,9 @@ export default function ProfileScreen() {
   // Loading state
   if (authLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={["left", "right"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["left", "right"]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" />
         </View>
       </SafeAreaView>
     );
@@ -54,25 +63,25 @@ export default function ProfileScreen() {
   // Not authenticated state
   if (!isAuthenticated || !profile) {
     return (
-      <SafeAreaView style={styles.container} edges={["left", "right"]}>
+      <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["left", "right"]}>
         <View style={styles.centerContent}>
-          <Ionicons name="person-circle-outline" size={80} color={Colors.textLight} />
-          <Text style={styles.notAuthTitle}>No has iniciado sesión</Text>
-          <Text style={styles.notAuthSubtitle}>
+          <Ionicons name="person-circle-outline" size={80} color={theme.colors.onSurfaceVariant} />
+          <Text variant="titleLarge" style={{ marginTop: 16 }}>
+            No has iniciado sesión
+          </Text>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, marginBottom: 24 }}>
             Inicia sesión para ver tu perfil
           </Text>
-          <Button 
-            title="Iniciar Sesión" 
-            onPress={() => router.push("/auth/login")} 
-            style={styles.authButton}
-          />
+          <Button mode="contained" onPress={() => router.push("/auth/login")}>
+            Iniciar Sesión
+          </Button>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["left", "right"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["left", "right"]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -81,163 +90,138 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <MemberAvatar user={profile} size="lg" />
-          <Text style={styles.userName}>{profile.display_name}</Text>
-          <Text style={styles.userEmail}>
+          <Text variant="headlineSmall" style={{ fontWeight: "700", marginTop: 12 }}>
+            {profile.display_name}
+          </Text>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
             {profile.email || "usuario@podium.app"}
           </Text>
           {profile.bio && (
-            <Text style={styles.userBio}>{profile.bio}</Text>
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: "center", maxWidth: 280 }}>
+              {profile.bio}
+            </Text>
           )}
         </View>
 
         {/* Stats */}
-        <Card variant="elevated" padding="lg" style={styles.statsCard}>
+        <Surface style={[styles.statsCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
           <View style={styles.statsRow}>
             <View style={styles.stat}>
               {groupsLoading ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" />
               ) : (
-                <Text style={styles.statValue}>{totalGroups}</Text>
+                <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: "700" }}>
+                  {totalGroups}
+                </Text>
               )}
-              <Text style={styles.statLabel}>Grupos</Text>
+              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                Grupos
+              </Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.outline }]} />
             <View style={styles.stat}>
               {groupsLoading ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" />
               ) : (
-                <Text style={styles.statValue}>{totalAwards}</Text>
+                <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: "700" }}>
+                  {totalAwards}
+                </Text>
               )}
-              <Text style={styles.statLabel}>Premios</Text>
+              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                Premios
+              </Text>
             </View>
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.outline }]} />
             <View style={styles.stat}>
-              <Text style={styles.statValue}>0</Text>
-              <Text style={styles.statLabel}>Ganados</Text>
+              <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: "700" }}>
+                0
+              </Text>
+              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+                Ganados
+              </Text>
             </View>
           </View>
-        </Card>
+        </Surface>
 
         {/* Settings Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuración</Text>
+          <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+            Configuración
+          </Text>
 
-          <Card variant="default" padding="none">
-            <SettingsItem 
-              icon="notifications-outline" 
-              title="Notificaciones" 
-              onPress={() => {}} 
+          <Card mode="outlined">
+            <List.Item
+              title="Notificaciones"
+              left={(props) => <List.Icon {...props} icon="bell-outline" />}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => {}}
             />
-            <SettingsItem 
-              icon="color-palette-outline" 
-              title="Apariencia" 
-              onPress={() => {}} 
+            <Divider />
+            <List.Item
+              title="Apariencia"
+              left={(props) => <List.Icon {...props} icon="palette-outline" />}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => {}}
             />
-            <SettingsItem 
-              icon="lock-closed-outline" 
-              title="Privacidad" 
-              onPress={() => {}} 
+            <Divider />
+            <List.Item
+              title="Privacidad"
+              left={(props) => <List.Icon {...props} icon="lock-outline" />}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => {}}
             />
-            <SettingsItem 
-              icon="help-circle-outline" 
-              title="Ayuda" 
-              onPress={() => {}} 
-              last 
+            <Divider />
+            <List.Item
+              title="Ayuda"
+              left={(props) => <List.Icon {...props} icon="help-circle-outline" />}
+              right={(props) => <List.Icon {...props} icon="chevron-right" />}
+              onPress={() => {}}
             />
           </Card>
         </View>
 
         {/* Logout */}
         <Button
-          title="Cerrar Sesión"
-          variant="secondary"
+          mode="outlined"
           onPress={handleSignOut}
           style={styles.logoutButton}
-        />
+          textColor={theme.colors.error}
+        >
+          Cerrar Sesión
+        </Button>
 
-        <Text style={styles.version}>Podium v1.0.0</Text>
+        <Text variant="labelSmall" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
+          Podium v1.0.0
+        </Text>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-interface SettingsItemProps {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  onPress: () => void;
-  last?: boolean;
-}
-
-function SettingsItem({ icon, title, onPress, last }: SettingsItemProps) {
-  return (
-    <TouchableOpacity 
-      style={[styles.settingsItem, !last && styles.settingsItemBorder]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Ionicons name={icon} size={22} color={Colors.textSecondary} style={styles.settingsIcon} />
-      <Text style={styles.settingsTitle}>{title}</Text>
-      <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
-    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
   },
   centerContent: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: theme.spacing.lg,
-  },
-  notAuthTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: Colors.text,
-    marginTop: theme.spacing.lg,
-  },
-  notAuthSubtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    marginBottom: theme.spacing.lg,
-  },
-  authButton: {
-    minWidth: 200,
+    padding: appTheme.spacing.lg,
   },
   profileHeader: {
     alignItems: "center",
-    marginBottom: theme.spacing.xl,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: Colors.text,
-    marginTop: theme.spacing.md,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
-  userBio: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: theme.spacing.sm,
-    textAlign: "center",
-    maxWidth: 280,
+    marginBottom: appTheme.spacing.xl,
   },
   statsCard: {
-    marginBottom: theme.spacing.xl,
+    borderRadius: appTheme.borderRadius.lg,
+    padding: appTheme.spacing.lg,
+    marginBottom: appTheme.spacing.xl,
   },
   statsRow: {
     flexDirection: "row",
@@ -249,53 +233,15 @@ const styles = StyleSheet.create({
     minHeight: 50,
     justifyContent: "center",
   },
-  statValue: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: Colors.primary,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
-  },
   statDivider: {
     width: 1,
     height: 40,
-    backgroundColor: Colors.border,
   },
   section: {
-    marginBottom: theme.spacing.xl,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: theme.spacing.md,
-  },
-  settingsItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: theme.spacing.md,
-  },
-  settingsItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  settingsIcon: {
-    marginRight: theme.spacing.md,
-  },
-  settingsTitle: {
-    flex: 1,
-    fontSize: 16,
-    color: Colors.text,
+    marginBottom: appTheme.spacing.xl,
   },
   logoutButton: {
-    marginBottom: theme.spacing.lg,
-  },
-  version: {
-    textAlign: "center",
-    fontSize: 12,
-    color: Colors.textLight,
+    marginBottom: appTheme.spacing.lg,
   },
 });
+

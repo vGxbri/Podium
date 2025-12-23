@@ -1,24 +1,21 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
+import { Button, HelperText, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button } from "../../components/ui/Button";
-import { Input } from "../../components/ui/Input";
-import { Colors } from "../../constants/Colors";
-import { theme } from "../../constants/theme";
+import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const theme = useTheme();
   const { signUp } = useAuth();
   
   const [displayName, setDisplayName] = useState("");
@@ -65,8 +62,10 @@ export default function RegisterScreen() {
     password.length >= 6 && 
     password === confirmPassword;
 
+  const passwordsDoNotMatch = confirmPassword && password !== confirmPassword;
+
   return (
-    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -79,67 +78,81 @@ export default function RegisterScreen() {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.logo}>🏆</Text>
-            <Text style={styles.title}>Crear Cuenta</Text>
-            <Text style={styles.subtitle}>
+            <Text variant="headlineMedium" style={{ fontWeight: "700" }}>
+              Crear Cuenta
+            </Text>
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: "center" }}>
               Únete a Podium y empieza a premiar
             </Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            <Input
+            <TextInput
               label="Nombre"
               placeholder="Tu nombre"
               value={displayName}
               onChangeText={setDisplayName}
-              autoCapitalize="words"
-              autoComplete="name"
+              mode="outlined"
+              style={styles.input}
             />
 
-            <Input
+            <TextInput
               label="Email"
               placeholder="tu@email.com"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              autoComplete="email"
+              mode="outlined"
+              style={styles.input}
             />
 
-            <Input
+            <TextInput
               label="Contraseña"
               placeholder="Mínimo 6 caracteres"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              autoComplete="new-password"
+              mode="outlined"
+              style={styles.input}
             />
 
-            <Input
+            <TextInput
               label="Confirmar Contraseña"
               placeholder="Repite la contraseña"
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
-              autoComplete="new-password"
-              error={confirmPassword && password !== confirmPassword ? "Las contraseñas no coinciden" : undefined}
+              mode="outlined"
+              error={!!passwordsDoNotMatch}
+              style={styles.input}
             />
+            {passwordsDoNotMatch && (
+              <HelperText type="error" visible>
+                Las contraseñas no coinciden
+              </HelperText>
+            )}
 
             <Button
-              title="Crear Cuenta"
+              mode="contained"
               onPress={handleRegister}
               loading={loading}
               disabled={!isFormValid}
               style={styles.button}
-            />
+            >
+              Crear Cuenta
+            </Button>
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.footerText}>¿Ya tienes cuenta?</Text>
-            <TouchableOpacity onPress={() => router.push("/auth/login")}>
-              <Text style={styles.footerLink}> Inicia Sesión</Text>
-            </TouchableOpacity>
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+              ¿Ya tienes cuenta?
+            </Text>
+            <Button mode="text" compact onPress={() => router.push("/auth/login")}>
+              Inicia Sesión
+            </Button>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -150,7 +163,6 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -160,46 +172,29 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    padding: theme.spacing.lg,
+    padding: appTheme.spacing.lg,
     justifyContent: "center",
   },
   header: {
     alignItems: "center",
-    marginBottom: theme.spacing.xl,
+    marginBottom: appTheme.spacing.xl,
   },
   logo: {
     fontSize: 48,
-    marginBottom: theme.spacing.sm,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: theme.spacing.xs,
-    textAlign: "center",
+    marginBottom: appTheme.spacing.sm,
   },
   form: {
-    marginBottom: theme.spacing.xl,
+    marginBottom: appTheme.spacing.xl,
+  },
+  input: {
+    marginBottom: appTheme.spacing.sm,
   },
   button: {
-    marginTop: theme.spacing.md,
+    marginTop: appTheme.spacing.md,
   },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-  },
-  footerText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  footerLink: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: "600",
   },
 });

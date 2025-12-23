@@ -1,19 +1,21 @@
 import { Stack } from "expo-router";
-import { Colors } from "../../constants/Colors";
+import { useTheme } from "react-native-paper";
 
 export default function JoinLayout() {
+  const theme = useTheme();
+  
   return (
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: Colors.background,
+          backgroundColor: theme.colors.surface,
         },
-        headerTintColor: Colors.primary,
+        headerTintColor: theme.colors.primary,
         headerTitleStyle: {
           fontWeight: "600",
         },
         contentStyle: {
-          backgroundColor: Colors.background,
+          backgroundColor: theme.colors.background,
         },
       }}
     >
