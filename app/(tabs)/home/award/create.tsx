@@ -22,11 +22,10 @@ import {
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
+import { awardIconOptions, defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
-
-const awardIcons = ["🏆", "🌟", "🎖️", "🥇", "👑", "💎", "🏅", "⭐"];
 
 export default function CreateAwardScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
@@ -38,7 +37,7 @@ export default function CreateAwardScreen() {
   
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedIcon, setSelectedIcon] = useState("🏆");
+  const [selectedIcon, setSelectedIcon] = useState<IconName>(defaultAwardIcon);
   const [selectedNominees, setSelectedNominees] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -118,19 +117,23 @@ export default function CreateAwardScreen() {
               Icono del premio
             </Text>
             <View style={styles.iconGrid}>
-              {awardIcons.map((icon) => (
+              {awardIconOptions.map((iconName) => (
                 <TouchableOpacity
-                  key={icon}
+                  key={iconName}
                   style={[
                     styles.iconButton,
                     { 
-                      backgroundColor: selectedIcon === icon ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                      borderColor: selectedIcon === icon ? theme.colors.primary : 'transparent'
+                      backgroundColor: selectedIcon === iconName ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                      borderColor: selectedIcon === iconName ? theme.colors.primary : 'transparent'
                     },
                   ]}
-                  onPress={() => setSelectedIcon(icon)}
+                  onPress={() => setSelectedIcon(iconName)}
                 >
-                  <Text style={styles.iconText}>{icon}</Text>
+                  {getIconComponent(
+                    iconName, 
+                    28, 
+                    selectedIcon === iconName ? theme.colors.primary : theme.colors.onSurfaceVariant
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -261,9 +264,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-  },
-  iconText: {
-    fontSize: 28,
   },
   input: {
     marginBottom: appTheme.spacing.md,

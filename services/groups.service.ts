@@ -1,11 +1,11 @@
 import { supabase } from '../lib/supabase';
 import {
-  CreateGroupInput,
-  Group,
-  GroupMemberView,
-  GroupWithDetails,
-  MemberRole,
-  UpdateGroupInput,
+    CreateGroupInput,
+    Group,
+    GroupMemberView,
+    GroupWithDetails,
+    MemberRole,
+    UpdateGroupInput,
 } from '../types/database';
 
 export const groupsService = {
@@ -32,7 +32,9 @@ export const groupsService = {
 
     // Get member counts and details for each group
     const groupsWithDetails = await Promise.all(
-      (memberships || []).map(async (membership) => {
+      (memberships || [])
+        .filter(m => (m.group as unknown as Group)?.status !== 'deleted')
+        .map(async (membership) => {
         const group = membership.group as unknown as Group;
         
         // Get members
@@ -77,6 +79,7 @@ export const groupsService = {
       .from('groups')
       .select('*')
       .eq('id', groupId)
+      .neq('status', 'deleted')
       .single();
 
     if (groupError) {
@@ -168,12 +171,17 @@ export const groupsService = {
    * Delete a group (soft delete by changing status)
    */
   async deleteGroup(groupId: string): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('groups')
       .update({ status: 'deleted' })
-      .eq('id', groupId);
+      .eq('id', groupId)
+      .select();
 
     if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      throw new Error('No tienes permiso para eliminar este grupo o el grupo no existe');
+    }
   },
 
   /**

@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -20,6 +21,7 @@ import {
     useTheme,
 } from "react-native-paper";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
+import { defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
@@ -249,7 +251,7 @@ export default function AwardDetailScreen() {
         {/* Header */}
         <Surface style={[styles.header, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
           <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surface }]} elevation={2}>
-            <Text style={styles.icon}>{award.icon}</Text>
+            {getIconComponent((award.icon as IconName) || defaultAwardIcon, 40, theme.colors.primary)}
           </Surface>
           <Text variant="headlineSmall" style={{ fontWeight: "bold", textAlign: "center", marginBottom: 8 }}>
             {award.name}
@@ -293,8 +295,8 @@ export default function AwardDetailScreen() {
                       {nominee.user.display_name}
                     </Text>
                     {award.status === 'completed' && nominee.is_winner && award.is_revealed && (
-                      <Chip compact style={{ backgroundColor: '#FFD700', marginTop: 4 }}>
-                        <Text style={{ fontSize: 11 }}>🏆 Ganador</Text>
+                      <Chip compact icon={() => <Ionicons name="trophy" size={12} color="#000" />} style={{ backgroundColor: '#FFD700', marginTop: 4 }}>
+                        Ganador
                       </Chip>
                     )}
                   </View>

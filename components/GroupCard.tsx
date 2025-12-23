@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Card, Surface, Text, useTheme } from 'react-native-paper';
+import { defaultGroupIcon, getIconComponent, IconName } from '../constants/icons';
 import { theme as appTheme } from '../constants/theme';
 import { GroupWithDetails } from '../types/database';
 
@@ -13,13 +14,14 @@ interface GroupCardProps {
 export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
   const theme = useTheme();
   const awardCount = group.awards?.length || 0;
+  const iconName = (group.icon as IconName) || defaultGroupIcon;
   
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
       <Card mode="elevated" style={styles.card}>
         <Card.Content style={styles.row}>
           <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-            <Text style={styles.icon}>{group.icon || '🏆'}</Text>
+            {getIconComponent(iconName, 24, theme.colors.primary)}
           </Surface>
           
           <View style={styles.content}>
@@ -65,9 +67,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: appTheme.spacing.md,
-  },
-  icon: {
-    fontSize: 24,
   },
   content: {
     flex: 1,

@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -53,7 +54,9 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.logo}>🏆</Text>
+            <View style={[styles.logoContainer, { backgroundColor: theme.colors.primaryContainer }]}>
+              <Ionicons name="trophy" size={48} color={theme.colors.primary} />
+            </View>
             <Text variant="displaySmall" style={{ fontWeight: "800", color: theme.colors.primary, letterSpacing: 1 }}>
               Podium
             </Text>
@@ -130,8 +133,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: appTheme.spacing.xl * 2,
   },
-  logo: {
-    fontSize: 64,
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: appTheme.spacing.md,
   },
   form: {

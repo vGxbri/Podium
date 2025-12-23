@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -77,7 +78,9 @@ export default function RegisterScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.logo}>🏆</Text>
+            <View style={[styles.logoContainer, { backgroundColor: theme.colors.primaryContainer }]}>
+              <Ionicons name="trophy" size={40} color={theme.colors.primary} />
+            </View>
             <Text variant="headlineMedium" style={{ fontWeight: "700" }}>
               Crear Cuenta
             </Text>
@@ -179,8 +182,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: appTheme.spacing.xl,
   },
-  logo: {
-    fontSize: 48,
+  logoContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: appTheme.spacing.sm,
   },
   form: {

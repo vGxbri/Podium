@@ -19,10 +19,9 @@ import {
   useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { defaultGroupIcon, getIconComponent, groupIconOptions, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
-
-const predefinedIcons = ["🏆", "👥", "🏠", "💼", "🎮", "⚽", "🎵", "📚", "✈️", "❤️"];
 
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,7 +40,7 @@ export default function GroupSettingsScreen() {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [icon, setIcon] = useState("🏆");
+  const [icon, setIcon] = useState<IconName>(defaultGroupIcon);
   
   // Settings
   const [allowMemberNominations, setAllowMemberNominations] = useState(false);
@@ -54,7 +53,7 @@ export default function GroupSettingsScreen() {
     if (group) {
       setName(group.name);
       setDescription(group.description || "");
-      setIcon(group.icon);
+      setIcon((group.icon as IconName) || defaultGroupIcon);
       setAllowMemberNominations(group.settings.allow_member_nominations);
       setAllowMemberVoting(group.settings.allow_member_voting);
       setRequireApproval(group.settings.require_approval);
@@ -153,19 +152,19 @@ export default function GroupSettingsScreen() {
               <View style={styles.iconSelector}>
                 <Text variant="labelLarge" style={{ marginBottom: 8 }}>Icono</Text>
                 <View style={styles.iconGrid}>
-                  {predefinedIcons.map((item) => (
+                  {groupIconOptions.map((iconName) => (
                     <TouchableOpacity
-                      key={item}
+                      key={iconName}
                       style={[
                         styles.iconOption,
                         { 
-                          backgroundColor: icon === item ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                          borderColor: icon === item ? theme.colors.primary : 'transparent'
+                          backgroundColor: icon === iconName ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                          borderColor: icon === iconName ? theme.colors.primary : 'transparent'
                         }
                       ]}
-                      onPress={() => setIcon(item)}
+                      onPress={() => setIcon(iconName)}
                     >
-                      <Text style={styles.iconText}>{item}</Text>
+                      {getIconComponent(iconName, 24, icon === iconName ? theme.colors.primary : theme.colors.onSurfaceVariant)}
                     </TouchableOpacity>
                   ))}
                 </View>

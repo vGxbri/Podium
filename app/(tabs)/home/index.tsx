@@ -2,19 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    View
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  View
 } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    FAB,
-    Surface,
-    Text,
-    useTheme
+  ActivityIndicator,
+  Button,
+  Card,
+  FAB,
+  Surface,
+  Text,
+  useTheme
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupCard } from "../../../components/GroupCard";
@@ -129,10 +129,7 @@ export default function HomeScreen() {
             </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Button mode="text" compact onPress={handleJoinGroup}>
-                Unirse
-              </Button>
-              <Button mode="text" compact onPress={handleCreateGroup}>
-                + Nuevo
+                + Unirme
               </Button>
             </View>
           </View>
@@ -240,9 +237,11 @@ const styles = StyleSheet.create({
     paddingVertical: appTheme.spacing.xl,
   },
   emptyButtons: {
-    flexDirection: "row",
+    flexDirection: "column",
     gap: appTheme.spacing.md,
     marginTop: appTheme.spacing.lg,
+    width: '90%',
+    maxWidth: 280,
   },
   fab: {
     position: "absolute",

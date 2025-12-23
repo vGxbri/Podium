@@ -214,7 +214,7 @@ export default function JoinGroupScreen() {
           <Card.Content style={{ alignItems: "center" }}>
             {/* Group Icon */}
             <Surface style={[styles.groupIconContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-              <Text style={styles.groupIcon}>{group?.icon || "🏆"}</Text>
+              {getIconComponent((group?.icon as IconName) || defaultGroupIcon, 40, theme.colors.primary)}
             </Surface>
 
             {/* Group Info */}

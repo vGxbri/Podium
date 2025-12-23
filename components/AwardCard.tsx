@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Card, Chip, Surface, Text, useTheme } from 'react-native-paper';
+import { defaultAwardIcon, getIconComponent, IconName } from '../constants/icons';
 import { theme as appTheme } from '../constants/theme';
 import { Award, AwardWithNominees } from '../types/database';
 
@@ -13,6 +14,7 @@ interface AwardCardProps {
 
 export const AwardCard: React.FC<AwardCardProps> = ({ award, nomineeCount, onPress }) => {
   const theme = useTheme();
+  const iconName = (award.icon as IconName) || defaultAwardIcon;
   
   const statusConfig: Record<string, { label: string; color: string; icon: 'document-outline' | 'checkmark-circle' | 'hourglass' | 'trophy' | 'archive-outline' }> = {
     draft: { label: 'Borrador', color: theme.colors.onSurfaceVariant, icon: 'document-outline' },
@@ -31,7 +33,7 @@ export const AwardCard: React.FC<AwardCardProps> = ({ award, nomineeCount, onPre
         <Card.Content>
           <View style={styles.header}>
             <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-              <Text style={styles.icon}>{award.icon || '🏆'}</Text>
+              {getIconComponent(iconName, 20, theme.colors.primary)}
             </Surface>
             <Chip 
               compact 
@@ -85,9 +87,6 @@ const styles = StyleSheet.create({
     borderRadius: appTheme.borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  icon: {
-    fontSize: 20,
   },
   footer: {
     flexDirection: 'row',

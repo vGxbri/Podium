@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AwardCard } from "../../../../components/AwardCard";
 import { InviteModal } from "../../../../components/InviteModal";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
+import { defaultGroupIcon, getIconComponent, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 
@@ -131,7 +132,7 @@ export default function GroupDetailScreen() {
           <Surface style={[styles.headerCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
             <View style={styles.headerRow}>
               <Surface style={[styles.groupIcon, { backgroundColor: theme.colors.surface }]} elevation={0}>
-                <Text style={styles.groupIconText}>{group.icon || "🏆"}</Text>
+                {getIconComponent((group.icon as IconName) || defaultGroupIcon, 32, theme.colors.primary)}
               </Surface>
               <View style={styles.headerInfo}>
                 <Text variant="titleLarge" style={{ fontWeight: "700" }}>
@@ -247,7 +248,7 @@ export default function GroupDetailScreen() {
             {!group.awards || group.awards.length === 0 ? (
               <Card mode="outlined">
                 <Card.Content style={styles.emptyState}>
-                  <Text style={styles.emptyIcon}>🏆</Text>
+                  {getIconComponent("trophy", 40, theme.colors.primary)}
                   <Text variant="titleMedium">No hay premios aún</Text>
                   <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: "center" }}>
                     {isAdmin

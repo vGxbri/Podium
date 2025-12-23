@@ -1,27 +1,26 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    Button,
-    Card,
-    Surface,
-    Text,
-    TextInput,
-    useTheme,
+  Button,
+  Card,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { defaultGroupIcon, getIconComponent, groupIconOptions, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { groupsService } from "../../../../services";
-
-const groupIcons = ["🏆", "🎉", "⭐", "🎄", "🎯", "🔥", "💎", "🎭"];
 
 export default function CreateGroupScreen() {
   const router = useRouter();
@@ -29,7 +28,7 @@ export default function CreateGroupScreen() {
   const theme = useTheme();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedIcon, setSelectedIcon] = useState("🏆");
+  const [selectedIcon, setSelectedIcon] = useState<IconName>(defaultGroupIcon);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -74,19 +73,23 @@ export default function CreateGroupScreen() {
               Icono del grupo
             </Text>
             <View style={styles.iconGrid}>
-              {groupIcons.map((icon) => (
+              {groupIconOptions.map((iconName) => (
                 <TouchableOpacity
-                  key={icon}
+                  key={iconName}
                   style={[
                     styles.iconButton,
                     { 
-                      backgroundColor: selectedIcon === icon ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                      borderColor: selectedIcon === icon ? theme.colors.primary : 'transparent'
+                      backgroundColor: selectedIcon === iconName ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                      borderColor: selectedIcon === iconName ? theme.colors.primary : 'transparent'
                     },
                   ]}
-                  onPress={() => setSelectedIcon(icon)}
+                  onPress={() => setSelectedIcon(iconName)}
                 >
-                  <Text style={styles.iconText}>{icon}</Text>
+                  {getIconComponent(
+                    iconName, 
+                    28, 
+                    selectedIcon === iconName ? theme.colors.primary : theme.colors.onSurfaceVariant
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -116,9 +119,10 @@ export default function CreateGroupScreen() {
 
           {/* Info */}
           <Card mode="outlined" style={styles.infoBox}>
-            <Card.Content>
-              <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
-                🎉 Serás administrador del grupo automáticamente
+            <Card.Content style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {getIconComponent("celebration", 20, theme.colors.primary)}
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, flex: 1 }}>
+                Serás administrador del grupo automáticamente
               </Text>
             </Card.Content>
           </Card>
@@ -168,9 +172,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-  },
-  iconText: {
-    fontSize: 28,
   },
   input: {
     marginBottom: appTheme.spacing.md,
