@@ -7,6 +7,7 @@
 export type MemberRole = 'owner' | 'admin' | 'member';
 export type GroupStatus = 'active' | 'archived' | 'deleted';
 export type AwardStatus = 'draft' | 'nominations' | 'voting' | 'completed' | 'archived';
+export type VoteType = 'person' | 'photo' | 'video' | 'audio' | 'text';
 export type InvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 export type NotificationType = 
   | 'group_invite'
@@ -110,6 +111,7 @@ export interface Award {
   description: string | null;
   icon: string;
   status: AwardStatus;
+  vote_type: VoteType;
   voting_settings: VotingSettings;
   nominations_start_at: string | null;
   nominations_end_at: string | null;
@@ -130,6 +132,7 @@ export interface Nominee {
   user_id: string;
   nominated_by: string | null;
   nomination_reason: string | null;
+  content_url: string | null;
   vote_count: number;
   is_winner: boolean;
   created_at: string;
@@ -225,6 +228,7 @@ export interface CreateAwardInput {
   description?: string;
   icon?: string;
   category_id?: string;
+  vote_type?: VoteType;
   nominee_ids: string[];
 }
 

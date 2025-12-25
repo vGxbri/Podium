@@ -1,3 +1,5 @@
+import { decode } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import {
   Award,
@@ -86,6 +88,7 @@ export const awardsService = {
         description: input.description || null,
         icon: input.icon || '🏆',
         category_id: input.category_id || null,
+        vote_type: input.vote_type || 'person',
         status: 'draft',
         created_by: user.id,
         voting_settings: {
@@ -173,7 +176,7 @@ export const awardsService = {
   /**
    * Add a nominee to an award
    */
-  async addNominee(awardId: string, userId: string, reason?: string): Promise<Nominee> {
+  async addNominee(awardId: string, userId: string, reason?: string, contentUrl?: string): Promise<Nominee> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
@@ -184,6 +187,7 @@ export const awardsService = {
         user_id: userId,
         nominated_by: user.id,
         nomination_reason: reason || null,
+        content_url: contentUrl || null,
       })
       .select()
       .single();
@@ -211,18 +215,30 @@ export const awardsService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // Check if user is a nominee for this award
-    const { data: nomineeCheck, error: checkError } = await supabase
-      .from('nominees')
-      .select('id')
-      .eq('award_id', awardId)
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Get award details to check type
+    const { data: award, error: awardFetchError } = await supabase
+      .from('awards')
+      .select('vote_type')
+      .eq('id', awardId)
+      .single();
 
-    if (checkError) throw checkError;
+    if (awardFetchError) throw awardFetchError;
 
-    if (nomineeCheck) {
-      throw new Error('No puedes votar en un premio donde estás nominado');
+    // Only prevent self-voting if NOT a photo, video, audio or text award
+    if (!['photo', 'video', 'audio', 'text'].includes(award.vote_type)) {
+      // Check if user is a nominee for this award
+      const { data: nomineeCheck, error: checkError } = await supabase
+        .from('nominees')
+        .select('id')
+        .eq('award_id', awardId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (nomineeCheck) {
+        throw new Error('No puedes votar en un premio donde estás nominado');
+      }
     }
 
     const { error } = await supabase
@@ -340,5 +356,50 @@ export const awardsService = {
 
     if (error) throw error;
     return data;
+  },
+
+  /**
+   * Upload nominee media
+   */
+  async uploadNomineeMedia(awardId: string, uri: string, mimeType?: string, originalFileName?: string): Promise<string> {
+    const fileExt = originalFileName ? originalFileName.split('.').pop()?.toLowerCase() || 'bin' : uri.split('.').pop()?.toLowerCase() || 'bin';
+    const fileName = `${awardId}/${Date.now()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    let contentType = mimeType;
+    // If mimeType is missing OR is generic octet-stream, try to detect from extension
+    if (!contentType || contentType === 'application/octet-stream') {
+       // Fallback detection
+       if (['jpg', 'jpeg', 'png', 'webp'].includes(fileExt)) contentType = `image/${fileExt === 'jpg' ? 'jpeg' : fileExt}`;
+       else if (['mp4', 'mov', 'avi'].includes(fileExt)) contentType = `video/${fileExt === 'mov' ? 'quicktime' : fileExt}`;
+       else if (['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma'].includes(fileExt)) {
+          // Precise audio mime types
+          if (fileExt === 'mp3') contentType = 'audio/mpeg';
+          else if (fileExt === 'm4a') contentType = 'audio/mp4';
+          else if (fileExt === 'wav') contentType = 'audio/wav';
+          else if (fileExt === 'aac') contentType = 'audio/aac';
+          else contentType = `audio/${fileExt}`;
+       }
+       else contentType = 'application/octet-stream';
+    }
+
+    // Read file as base64 using Expo FileSystem
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: 'base64',
+    });
+
+    const { error } = await supabase.storage
+      .from('awards')
+      .upload(filePath, decode(base64), {
+        contentType,
+      });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage
+      .from('awards')
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
   },
 };

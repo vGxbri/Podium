@@ -1,29 +1,37 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import * as DocumentPicker from 'expo-document-picker';
+import { Image } from 'expo-image';
+import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useVideoPlayer, VideoView } from 'expo-video';
 import React, { useCallback, useState } from "react";
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
+
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Chip,
-    Surface,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  Portal,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
 import { defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
-import { useGroup } from "../../../../hooks";
+import { useAuth, useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
 import { AwardWithNominees } from "../../../../types/database";
 
@@ -42,7 +50,8 @@ export default function AwardDetailScreen() {
   const router = useRouter();
   const theme = useTheme();
   
-  const { isAdmin } = useGroup(groupId);
+  const { group, isAdmin } = useGroup(groupId);
+  const { user } = useAuth();
   
   const [award, setAward] = useState<AwardWithNominees | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +63,16 @@ export default function AwardDetailScreen() {
   const [deadlineMode, setDeadlineMode] = useState<'24h' | '48h' | '1w' | 'custom'>('24h');
   const [customDate, setCustomDate] = useState("");
   const [customTime, setCustomTime] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  
+  // Audio nomination temp state
+  const [showAudioTitleModal, setShowAudioTitleModal] = useState(false);
+  const [audioTitle, setAudioTitle] = useState("");
+  const [tempAudio, setTempAudio] = useState<{ uri: string; mimeType?: string; name: string } | null>(null);
+
+  // Text nomination state
+  const [showTextModal, setShowTextModal] = useState(false);
+  const [textNomination, setTextNomination] = useState("");
 
   const fetchAward = React.useCallback(async () => {
     try {
@@ -109,6 +128,13 @@ export default function AwardDetailScreen() {
       }
 
       setActionLoading(true);
+      
+      // Validation: Minimum 2 nominees/photos required
+      if (award.nominees.length < 2) {
+        Alert.alert("No se puede iniciar", "Se necesitan mínimo 2 candidatos para empezar la votación");
+        return;
+      }
+
       await awardsService.updateAwardStatus(award.id, 'voting', deadlineDate?.toISOString());
       
       setShowStartVotingModal(false);
@@ -214,6 +240,127 @@ export default function AwardDetailScreen() {
       ]
     );
   };
+
+  const handleAddNomineeWithPhoto = async () => {
+    if (!award || !user) return;
+
+    if (award.vote_type === 'text') {
+      setShowTextModal(true);
+      return;
+    }
+
+    try {
+      const isVideo = award.vote_type === 'video';
+      const isAudio = award.vote_type === 'audio';
+
+      let uri: string | undefined;
+      let mimeType: string | undefined;
+      let fileName: string | undefined;
+
+      if (isAudio) {
+         const docResult = await DocumentPicker.getDocumentAsync({
+            type: '*/*', // Allow all files to avoid Android MIME type issues
+            copyToCacheDirectory: true,
+         });
+         
+         if (docResult.canceled) return;
+         
+         const asset = docResult.assets[0];
+         const assetNameLower = asset.name.toLowerCase();
+         const validAudioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg', '.wma'];
+         
+         if (!validAudioExtensions.some(ext => assetNameLower.endsWith(ext))) {
+            Alert.alert("Formato no válido", "Por favor selecciona un archivo de audio válido (.mp3, .wav, .m4a, etc.)");
+            return;
+         }
+
+         uri = asset.uri;
+         mimeType = asset.mimeType;
+         fileName = asset.name;
+
+         // Open modal to ask for title
+         setTempAudio({ uri, mimeType, name: fileName });
+         setAudioTitle(""); // Reset title
+         setShowAudioTitleModal(true);
+         return; // Stop here, wait for modal submit
+      } else {
+         // Photo or Video
+         const result = await ImagePicker.launchImageLibraryAsync({
+           mediaTypes: isVideo ? ['videos'] : ['images'],
+           allowsEditing: false,
+           quality: 0.8,
+         });
+         if (result.canceled) return;
+         uri = result.assets[0].uri;
+         mimeType = result.assets[0].mimeType;
+         fileName = result.assets[0].fileName || undefined;
+      }
+      
+      setActionLoading(true);
+
+      // 2. Upload Media
+      const publicUrl = await awardsService.uploadNomineeMedia(award.id, uri!, mimeType, fileName); // uri is guaranteed here
+
+      // 3. Add Nominee
+      await awardsService.addNominee(award.id, user.id, undefined, publicUrl);
+      
+      let typeLabel = 'Foto';
+      if (isVideo) typeLabel = 'Vídeo';
+
+      Alert.alert("Éxito", `${typeLabel} añadida correctamente`);
+      fetchAward();
+
+    } catch (error: any) {
+      console.error(error);
+      Alert.alert("Error", error.message || "No se pudo subir");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSubmitAudioNomination = async () => {
+    if (!tempAudio || !award || !user) return;
+    if (!audioTitle.trim()) {
+        Alert.alert("Error", "Por favor añade un título al audio");
+        return;
+    }
+
+    try {
+        setActionLoading(true);
+        // Upload
+        const publicUrl = await awardsService.uploadNomineeMedia(award.id, tempAudio.uri, tempAudio.mimeType, tempAudio.name);
+        
+        // Add nominee with Reason = Title
+        await awardsService.addNominee(award.id, user.id, audioTitle, publicUrl);
+
+        Alert.alert("Éxito", "Audio añadido correctamente");
+        setShowAudioTitleModal(false);
+        setTempAudio(null);
+        setAudioTitle("");
+        fetchAward();
+    } catch (error: any) {
+        Alert.alert("Error", error.message);
+    } finally {
+        setActionLoading(false);
+    }
+  };
+
+  const handleSubmitTextNomination = async () => {
+    if (!textNomination.trim() || !award || !user) return;
+    
+    try {
+      setActionLoading(true);
+      await awardsService.addNominee(award.id, user.id, undefined, textNomination);
+      Alert.alert("Éxito", "Texto añadido correctamente");
+      setShowTextModal(false);
+      setTextNomination("");
+      fetchAward();
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
   
   if (loading) {
     return (
@@ -291,14 +438,42 @@ export default function AwardDetailScreen() {
                 <Card.Content style={styles.nomineeRow}>
                   <MemberAvatar user={nominee.user} size="md" />
                   <View style={styles.nomineeInfo}>
-                    <Text variant="bodyLarge" style={{ fontWeight: "500" }}>
-                      {nominee.user.display_name}
-                    </Text>
-                    {award.status === 'completed' && nominee.is_winner && award.is_revealed && (
-                      <Chip compact icon={() => <Ionicons name="trophy" size={12} color="#000" />} style={{ backgroundColor: '#FFD700', marginTop: 4 }}>
-                        Ganador
-                      </Chip>
-                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text variant="bodyLarge" style={{ fontWeight: "500" }}>
+                        {nominee.user.display_name}
+                      </Text>
+                      {award.status === 'completed' && nominee.is_winner && award.is_revealed && (
+                        <Chip compact icon={() => <Ionicons name="trophy" size={12} color="#000" />} style={{ backgroundColor: '#FFD700', height: 24 }}>
+                          Ganador
+                        </Chip>
+                      )}
+                    </View>
+                    
+                      {nominee.content_url && (
+                        <>
+                          {award.vote_type === 'video' ? (
+                            <TouchableOpacity onPress={() => setSelectedImage(nominee.content_url)} activeOpacity={0.9}>
+                               <View style={styles.nomineeImage}>
+                                 <NomineeVideoThumbnail uri={nominee.content_url} />
+                               </View>
+                            </TouchableOpacity>
+                          ) : award.vote_type === 'audio' ? (
+                            <TouchableOpacity onPress={() => setSelectedImage(nominee.content_url)} activeOpacity={0.9}>
+                               <NomineeAudioPlayer uri={nominee.content_url} title={nominee.nomination_reason || 'Audio'} />
+                            </TouchableOpacity>
+                          ) : award.vote_type === 'text' ? (
+                             <NomineeTextCard text={nominee.content_url} />
+                          ) : (
+                            <TouchableOpacity onPress={() => setSelectedImage(nominee.content_url)} activeOpacity={0.9}>
+                               <Image 
+                                 source={{ uri: nominee.content_url }} 
+                                 style={styles.nomineeImage} 
+                                 contentFit="cover" 
+                               />
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
                   </View>
                   
                   {award.status === 'voting' && (
@@ -328,6 +503,18 @@ export default function AwardDetailScreen() {
               {award.status === 'draft' && (
                 <Button mode="contained" onPress={() => setShowStartVotingModal(true)} loading={actionLoading}>
                   Iniciar Votación
+                </Button>
+              )}
+
+              {award.status === 'draft' && ['photo', 'video', 'audio', 'text'].includes(award.vote_type) && (
+                <Button 
+                  mode="outlined" 
+                  icon={award.vote_type === 'video' ? "video" : award.vote_type === 'audio' ? "microphone" : award.vote_type === 'text' ? "text" : "camera"} 
+                  onPress={handleAddNomineeWithPhoto}
+                  style={{ marginTop: 10 }}
+                  loading={actionLoading}
+                >
+                  {award.vote_type === 'video' ? "Añadir Vídeo" : award.vote_type === 'audio' ? "Añadir Audio" : award.vote_type === 'text' ? "Añadir Texto" : "Añadir Foto"}
                 </Button>
               )}
               
@@ -429,7 +616,171 @@ export default function AwardDetailScreen() {
           </Card>
         </View>
       </Modal>
+
+      <Modal
+        visible={!!selectedImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedImage(null)}
+      >
+        <View style={styles.fullScreenImageContainer}>
+          <TouchableOpacity 
+            style={styles.closeButton} 
+            onPress={() => setSelectedImage(null)}
+          >
+            <Ionicons name="close-circle" size={40} color="white" />
+          </TouchableOpacity>
+          
+          {award?.vote_type === 'video' ? (
+            <FullScreenVideoPlayer uri={selectedImage || ''} />
+          ) : award?.vote_type === 'audio' ? (
+            <FullScreenAudioPlayer uri={selectedImage || ''} />
+          ) : (
+            <Image 
+              source={{ uri: selectedImage || undefined }} 
+              style={styles.fullScreenImage} 
+              contentFit="contain" 
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Text Nomination Modal */}
+      <Portal>
+        <Dialog visible={showTextModal} onDismiss={() => setShowTextModal(false)}>
+          <Dialog.Title>Tu Nominación</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Escribe tu texto"
+              value={textNomination}
+              onChangeText={setTextNomination}
+              multiline
+              numberOfLines={4}
+              mode="outlined"
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowTextModal(false)}>Cancelar</Button>
+            <Button onPress={handleSubmitTextNomination} loading={actionLoading}>Enviar</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Audio Title Modal */}
+        <Dialog visible={showAudioTitleModal} onDismiss={() => setShowAudioTitleModal(false)}>
+            <Dialog.Title>Título del Audio</Dialog.Title>
+            <Dialog.Content>
+                <TextInput 
+                    label="Título del audio"
+                    value={audioTitle}
+                    onChangeText={setAudioTitle}
+                    mode="outlined"
+                />
+            </Dialog.Content>
+            <Dialog.Actions>
+                <Button onPress={() => setShowAudioTitleModal(false)}>Cancelar</Button>
+                <Button onPress={handleSubmitAudioNomination} loading={actionLoading}>Subir</Button>
+            </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
     </>
+  );
+}
+
+// Video Helper Components
+function NomineeVideoThumbnail({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, player => {
+    player.muted = true;
+    player.loop = true;
+  });
+
+  return (
+    <View style={{ flex: 1 }}>
+      <VideoView 
+        player={player} 
+        style={StyleSheet.absoluteFill} 
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <View style={{...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', alignItems: 'center', pointerEvents: 'none'}}>
+          <Ionicons name="play-circle" size={40} color="white" />
+      </View>
+    </View>
+  );
+}
+
+function FullScreenVideoPlayer({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, player => {
+    player.play();
+    player.loop = true;
+  });
+
+  return (
+    <VideoView 
+      player={player} 
+      style={{ width: '100%', height: '100%' }} 
+      contentFit="contain"
+      allowsPictureInPicture
+      fullscreenOptions={{ enable: true }}
+    />
+  );
+}
+
+function NomineeAudioPlayer({ uri, title }: { uri: string, title?: string }) {
+  // Simple thumbnail: icon + title
+  return (
+    <View style={[styles.nomineeImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+       <Ionicons name="musical-notes" size={48} color="#666" />
+       {title && (
+         <Text variant="labelMedium" style={{ marginTop: 8, color: '#333', fontWeight: 'bold' }} numberOfLines={1}>
+            {title}
+         </Text>
+       )}
+       <View style={{ position: 'absolute', bottom: 5, right: 5 }}>
+          <Ionicons name="play-circle" size={24} color="#000" />
+       </View>
+    </View>
+  );
+}
+
+function FullScreenAudioPlayer({ uri }: { uri: string }) {
+  const player = useAudioPlayer(uri || null);
+  const status = useAudioPlayerStatus(player);
+
+  const togglePlay = () => {
+    if (status.playing) player.pause();
+    else player.play();
+  };
+
+  return (
+    <View style={[styles.fullScreenImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
+       <Ionicons name="musical-notes" size={100} color="#fff" style={{ marginBottom: 40 }}/>
+       
+       <TouchableOpacity onPress={togglePlay}>
+          <Ionicons 
+             name={status.playing ? "pause-circle" : "play-circle"} 
+             size={80} 
+             color="#fff" 
+          />
+       </TouchableOpacity>
+       
+       <Text style={{ color: 'white', marginTop: 20 }}>
+          {status.currentTime ? Math.floor(status.currentTime / 1000) : 0}s / {status.duration ? Math.floor(status.duration / 1000) : 0}s
+       </Text>
+    </View>
+  );
+}
+
+function NomineeTextCard({ text }: { text: string }) {
+  // Enhanced card for text: scrollable if long, better styling
+  return (
+    <View style={[styles.nomineeImage, { backgroundColor: '#fff', padding: 8, justifyContent: 'flex-start' }]}>
+       <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
+          <Text style={{ fontSize: 13, lineHeight: 18, color: '#333', fontStyle: 'italic' }}>
+            &quot;{text}&quot;
+          </Text>
+       </ScrollView>
+    </View>
   );
 }
 
@@ -511,5 +862,28 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  nomineeImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  fullScreenImageContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1,
   },
 });

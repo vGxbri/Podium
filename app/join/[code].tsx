@@ -15,6 +15,7 @@ import {
     useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { defaultGroupIcon, getIconComponent, IconName } from "../../constants/icons";
 import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
 import { groupsService } from "../../services";

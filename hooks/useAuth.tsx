@@ -59,7 +59,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const loadSession = async () => {
     try {
       setIsLoading(true);
-      const currentSession = await authService.getSession();
+      // Create a timeout promise that rejects after 5 seconds
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Session load timed out')), 5000);
+      });
+
+      // Race between getSession and timeout
+      const currentSession = await Promise.race([
+        authService.getSession(),
+        timeoutPromise
+      ]) as Session | null;
+      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -68,6 +78,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('Error loading session:', error);
+      // If error (including timeout), we assume no session or let user login again
+      setSession(null);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }

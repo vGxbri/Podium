@@ -26,6 +26,15 @@ import { awardIconOptions, defaultAwardIcon, getIconComponent, IconName } from "
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
+import { VoteType } from "../../../../types/database";
+
+const VOTE_TYPE_OPTIONS: { value: VoteType; label: string; icon: string }[] = [
+  { value: 'person', label: 'Personas', icon: 'people' },
+  { value: 'photo', label: 'Fotos', icon: 'image' },
+  { value: 'video', label: 'Videos', icon: 'videocam' },
+  { value: 'audio', label: 'Audios', icon: 'musical-notes' },
+  { value: 'text', label: 'Texto', icon: 'document-text' },
+];
 
 export default function CreateAwardScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
@@ -39,6 +48,7 @@ export default function CreateAwardScreen() {
   const [description, setDescription] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<IconName>(defaultAwardIcon);
   const [selectedNominees, setSelectedNominees] = useState<string[]>([]);
+  const [selectedVoteType, setSelectedVoteType] = useState<VoteType>('person');
   const [loading, setLoading] = useState(false);
 
   // Loading state
@@ -78,7 +88,9 @@ export default function CreateAwardScreen() {
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || selectedNominees.length < 2 || !groupId) return;
+    // For person type, require nominees; for others, proceed without nominees
+    const needsNominees = selectedVoteType === 'person';
+    if (!name.trim() || (needsNominees && selectedNominees.length < 2) || !groupId) return;
 
     try {
       setLoading(true);
@@ -88,7 +100,8 @@ export default function CreateAwardScreen() {
         name: name.trim(),
         description: description.trim() || undefined,
         icon: selectedIcon,
-        nominee_ids: selectedNominees,
+        vote_type: selectedVoteType,
+        nominee_ids: needsNominees ? selectedNominees : [],
       });
       
       router.back();
@@ -161,64 +174,117 @@ export default function CreateAwardScreen() {
             style={styles.input}
           />
 
-          {/* Nominees Section */}
+          {/* Vote Type Selector */}
           <View style={styles.section}>
-            <View style={styles.nomineesHeader}>
-              <Text variant="labelLarge">Seleccionar nominados</Text>
-              <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
-                {selectedNominees.length} seleccionados
-              </Text>
-            </View>
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
-              Mínimo 2 nominados requeridos
+            <Text variant="labelLarge" style={{ marginBottom: 8 }}>
+              ¿Qué se va a votar?
             </Text>
-
-            <Card mode="outlined">
-              <Card.Content>
-                {group.members.length === 0 ? (
-                  <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
-                    No hay miembros en el grupo
+            <View style={styles.voteTypeGrid}>
+              {VOTE_TYPE_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.voteTypeButton,
+                    {
+                      backgroundColor: selectedVoteType === option.value ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
+                      borderColor: selectedVoteType === option.value ? theme.colors.primary : 'transparent'
+                    },
+                  ]}
+                  onPress={() => setSelectedVoteType(option.value)}
+                >
+                  <Ionicons
+                    name={option.icon as any}
+                    size={24}
+                    color={selectedVoteType === option.value ? theme.colors.primary : theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="labelSmall"
+                    style={{
+                      marginTop: 4,
+                      color: selectedVoteType === option.value ? theme.colors.primary : theme.colors.onSurfaceVariant
+                    }}
+                  >
+                    {option.label}
                   </Text>
-                ) : (
-                  group.members.map((member) => {
-                    const isSelected = selectedNominees.includes(member.user_id);
-                    return (
-                      <TouchableOpacity
-                        key={member.user_id}
-                        style={[
-                          styles.nomineeRow,
-                          isSelected && { backgroundColor: theme.colors.secondaryContainer },
-                        ]}
-                        onPress={() => toggleNominee(member.user_id)}
-                        activeOpacity={0.7}
-                      >
-                        <MemberAvatar user={member} size="sm" />
-                        <Text variant="bodyMedium" style={{ flex: 1, marginLeft: 12 }}>
-                          {member.display_name}
-                        </Text>
-                        <Checkbox
-                          status={isSelected ? 'checked' : 'unchecked'}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Nominees Section - Only show for 'person' vote type */}
+          {selectedVoteType === 'person' && (
+            <View style={styles.section}>
+              <View style={styles.nomineesHeader}>
+                <Text variant="labelLarge">Seleccionar nominados</Text>
+                <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
+                  {selectedNominees.length} seleccionados
+                </Text>
+              </View>
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
+                Mínimo 2 nominados requeridos
+              </Text>
+
+              <Card mode="outlined">
+                <Card.Content>
+                  {group.members.length === 0 ? (
+                    <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
+                      No hay miembros en el grupo
+                    </Text>
+                  ) : (
+                    group.members.map((member) => {
+                      const isSelected = selectedNominees.includes(member.user_id);
+                      return (
+                        <TouchableOpacity
+                          key={member.user_id}
+                          style={[
+                            styles.nomineeRow,
+                            isSelected && { backgroundColor: theme.colors.secondaryContainer },
+                          ]}
                           onPress={() => toggleNominee(member.user_id)}
-                        />
-                      </TouchableOpacity>
-                    );
-                  })
-                )}
+                          activeOpacity={0.7}
+                        >
+                          <MemberAvatar user={member} size="sm" />
+                          <Text variant="bodyMedium" style={{ flex: 1, marginLeft: 12 }}>
+                            {member.display_name}
+                          </Text>
+                          <Checkbox
+                            status={isSelected ? 'checked' : 'unchecked'}
+                            onPress={() => toggleNominee(member.user_id)}
+                          />
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </Card.Content>
+              </Card>
+            </View>
+          )}
+
+          {/* Info for non-person vote types */}
+          {selectedVoteType !== 'person' && (
+            <Card mode="outlined" style={styles.section}>
+              <Card.Content>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="information-circle-outline" size={24} color={theme.colors.primary} />
+                  <Text variant="bodyMedium" style={{ marginLeft: 12, flex: 1, color: theme.colors.onSurfaceVariant }}>
+                    Los participantes podrán subir {selectedVoteType === 'photo' ? 'fotos' : selectedVoteType === 'video' ? 'videos' : selectedVoteType === 'audio' ? 'audios' : 'textos'} cuando la votación esté activa.
+                  </Text>
+                </View>
               </Card.Content>
             </Card>
-          </View>
+          )}
         </ScrollView>
 
         {/* Submit Button */}
         <Surface style={[styles.footer, { paddingBottom: appTheme.spacing.lg + insets.bottom, backgroundColor: theme.colors.surface }]} elevation={1}>
-          <Button
-            mode="contained"
-            onPress={handleCreate}
-            loading={loading}
-            disabled={!name.trim() || selectedNominees.length < 2}
-          >
-            Crear Premio
-          </Button>
+            <Button
+              mode="contained"
+              onPress={handleCreate}
+              loading={loading}
+              disabled={!name.trim() || (selectedVoteType === 'person' && selectedNominees.length < 2)}
+            >
+              Crear Premio
+            </Button>
         </Surface>
       </KeyboardAvoidingView>
     </View>
@@ -284,5 +350,18 @@ const styles = StyleSheet.create({
   footer: {
     padding: appTheme.spacing.lg,
     paddingTop: appTheme.spacing.md,
+  },
+  voteTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: appTheme.spacing.sm,
+  },
+  voteTypeButton: {
+    width: 70,
+    height: 70,
+    borderRadius: appTheme.borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
   },
 });
