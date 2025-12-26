@@ -1,31 +1,35 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSnackbar } from "../../components/ui/SnackbarContext";
 import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
 
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { signIn } = useAuth();
+  const { showSnackbar } = useSnackbar();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert("Error", "Por favor ingresa email y contraseña");
+      showSnackbar("Por favor ingresa email y contraseña", "error");
       return;
     }
 
@@ -33,59 +37,94 @@ export default function LoginScreen() {
       setLoading(true);
       await signIn(email.trim(), password);
       router.replace("/");
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Error al iniciar sesión";
-      Alert.alert("Error", message);
+    } catch (err: any) {
+      // Handle specific Supabase error codes
+      let friendlyMessage = "Error al iniciar sesión";
+      
+      const errorMessage = err?.message || "";
+      const errorMsgLower = errorMessage.toLowerCase();
+      
+      if (errorMsgLower.includes("invalid login credentials") || 
+          errorMsgLower.includes("invalid email or password") ||
+          errorMsgLower.includes("invalid credentials")) {
+        friendlyMessage = "Correo o contraseña incorrectos";
+      } else if (errorMsgLower.includes("email not confirmed")) {
+        friendlyMessage = "Debes confirmar tu correo antes de iniciar sesión";
+      } else if (errorMsgLower.includes("user not found") || errorMsgLower.includes("no user with that email")) {
+        friendlyMessage = "No existe una cuenta con este correo";
+      } else if (errorMsgLower.includes("network") || errorMsgLower.includes("fetch")) {
+        friendlyMessage = "Error de conexión. Verifica tu internet.";
+      } else if (errorMessage) {
+        friendlyMessage = errorMessage;
+      }
+      
+      showSnackbar(friendlyMessage, "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["top", "left", "right"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["left", "right"]}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <ScrollView
           style={styles.scrollView}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingTop: insets.top + 32, paddingBottom: 32, justifyContent: 'center', flexGrow: 1 }
+          ]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.logoContainer, { backgroundColor: theme.colors.primaryContainer }]}>
-              <Ionicons name="trophy" size={48} color={theme.colors.primary} />
-            </View>
-            <Text variant="displaySmall" style={{ fontWeight: "800", color: theme.colors.primary, letterSpacing: 1 }}>
-              Podium
+            <Image 
+              source={require("../../assets/images/Glow.png")}
+              style={styles.logo}
+              contentFit="contain"
+            />
+            <Text variant="displaySmall" style={styles.title}>
+              Bienvenido
             </Text>
-            <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: "center" }}>
-              Gestiona premios con tus amigos
+            <Text variant="bodyLarge" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
+              Inicia sesión para continuar
             </Text>
           </View>
 
           {/* Form */}
           <View style={styles.form}>
             <TextInput
-              label="Email"
+              label="Correo electrónico"
               placeholder="tu@email.com"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               mode="outlined"
+              left={<TextInput.Icon icon="email-outline" />}
               style={styles.input}
+              outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
             />
 
             <TextInput
               label="Contraseña"
-              placeholder="Tu contraseña"
+              placeholder="••••••••"
               value={password}
               onChangeText={setPassword}
-              secureTextEntry
+              secureTextEntry={!showPassword}
               mode="outlined"
+              left={<TextInput.Icon icon="lock-outline" />}
+              right={
+                <TextInput.Icon 
+                  icon={showPassword ? "eye-off-outline" : "eye-outline"} 
+                  onPress={() => setShowPassword(!showPassword)}
+                />
+              }
               style={styles.input}
+              outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
             />
 
             <Button
@@ -93,10 +132,25 @@ export default function LoginScreen() {
               onPress={handleLogin}
               loading={loading}
               disabled={!email.trim() || !password}
-              style={styles.button}
+              style={[styles.button, { 
+                backgroundColor: theme.colors.primary,
+                borderWidth: 1,
+                borderColor: theme.colors.primary 
+              }]}
+              contentStyle={styles.buttonContent}
+              labelStyle={styles.buttonLabel}
             >
               Iniciar Sesión
             </Button>
+          </View>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
+            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, paddingHorizontal: 12 }}>
+              o
+            </Text>
+            <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
           </View>
 
           {/* Footer */}
@@ -104,9 +158,11 @@ export default function LoginScreen() {
             <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
               ¿No tienes cuenta?
             </Text>
-            <Button mode="text" compact onPress={() => router.push("/auth/register")}>
-              Regístrate
-            </Button>
+            <TouchableOpacity onPress={() => router.push("/auth/register")}>
+              <Text variant="bodyMedium" style={[styles.link, { color: theme.colors.tertiary }]}>
+                Regístrate aquí
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -125,34 +181,60 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flexGrow: 1,
-    padding: appTheme.spacing.lg,
-    justifyContent: "center",
+    paddingHorizontal: appTheme.spacing.xl,
   },
   header: {
     alignItems: "center",
-    marginBottom: appTheme.spacing.xl * 2,
+    marginBottom: 40,
   },
-  logoContainer: {
+  logo: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: appTheme.spacing.md,
+    marginBottom: 20,
+  },
+  title: {
+    fontWeight: "800",
+    marginBottom: 8,
+    letterSpacing: -1,
+  },
+  subtitle: {
+    textAlign: "center",
+    marginTop: 4,
   },
   form: {
-    marginBottom: appTheme.spacing.xl,
+    marginBottom: 32,
   },
   input: {
-    marginBottom: appTheme.spacing.md,
+    marginBottom: 16,
   },
   button: {
-    marginTop: appTheme.spacing.md,
+    marginTop: 8,
+    borderRadius: 12,
+  },
+  buttonContent: {
+    paddingVertical: 8,
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
   },
   footer: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  link: {
+    fontWeight: "700",
   },
 });

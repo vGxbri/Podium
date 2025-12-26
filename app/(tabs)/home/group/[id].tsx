@@ -3,7 +3,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -28,12 +27,34 @@ import { defaultGroupIcon, getIconComponent, IconName } from "../../../../consta
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 
+import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
+import { useSnackbar } from "../../../../components/ui/SnackbarContext";
+
 export default function GroupDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
   const [showInviteModal, setShowInviteModal] = useState(false);
+
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: DialogType;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: () => {},
+  });
+
+  const hideDialog = () => setDialogConfig(prev => ({ ...prev, visible: false }));
 
   const { 
     group, 
@@ -196,24 +217,20 @@ export default function GroupDetailScreen() {
                             <TouchableOpacity
                               style={styles.kickButton}
                               onPress={() => {
-                                Alert.alert(
-                                  "Expulsar miembro",
-                                  `¿Seguro que quieres expulsar a ${member.display_name} del grupo?`,
-                                  [
-                                    { text: "Cancelar", style: "cancel" },
-                                    {
-                                      text: "Expulsar",
-                                      style: "destructive",
-                                      onPress: async () => {
-                                        try {
-                                          await removeMember(member.user_id);
-                                        } catch {
-                                          Alert.alert("Error", "No se pudo expulsar al miembro");
-                                        }
-                                      }
+                                setDialogConfig({
+                                  visible: true,
+                                  title: "Expulsar miembro",
+                                  message: `¿Seguro que quieres expulsar a ${member.display_name} del grupo?`,
+                                  type: "warning",
+                                  confirmText: "Expulsar",
+                                  onConfirm: async () => {
+                                    try {
+                                      await removeMember(member.user_id);
+                                    } catch {
+                                      showSnackbar("No se pudo expulsar al miembro", "error");
                                     }
-                                  ]
-                                );
+                                  }
+                                });
                               }}
                             >
                               <Ionicons name="close-circle" size={24} color={theme.colors.error} />
@@ -296,6 +313,17 @@ export default function GroupDetailScreen() {
           groupName={group.name}
         />
       </View>
+      <ConfirmDialog
+        visible={dialogConfig.visible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        type={dialogConfig.type}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        onConfirm={dialogConfig.onConfirm}
+        onCancel={hideDialog}
+        showCancel={true}
+      />
     </>
   );
 }

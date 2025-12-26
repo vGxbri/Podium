@@ -24,13 +24,21 @@ export default function TabLayout() {
           fontWeight: "500",
           marginBottom: insets.bottom > 0 ? 0 : 8,
         },
+        // Android animations
+        animation: "fade", // Changed from "shift" to avoid green scrim
+        tabBarHideOnKeyboard: true,
         headerStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.background,
+          elevation: 1,
+          shadowOpacity: 0,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.outlineVariant,
         },
-        headerTintColor: theme.colors.onSurface,
+        headerTintColor: theme.colors.primary,
         headerTitleStyle: {
-          fontWeight: "700",
-          fontSize: 22,
+          fontWeight: "800",
+          fontSize: 24,
+          letterSpacing: -0.5,
         },
       }}
     >
@@ -48,12 +56,12 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: "",
+          headerShown: false, // No navbar on profile page
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
-      {/* Ocultar el antiguo index */}
       <Tabs.Screen
         name="index"
         options={{

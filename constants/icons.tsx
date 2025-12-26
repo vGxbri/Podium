@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { View } from "react-native";
 
 // Tipos de iconos disponibles
 export type IconName = 
@@ -76,6 +77,36 @@ export const getIconComponent = (iconName: IconName, size: number = 24, color: s
     return <MaterialCommunityIcons name={icon.name as any} size={size} color={color} />;
   }
   return <Ionicons name={icon.name as any} size={size} color={color} />;
+};
+
+export const getOutlinedIconComponent = (
+  iconName: IconName, 
+  size: number = 24, 
+  fillColor: string = "#000",
+  strokeColor: string = "#2A8A70",
+  strokeWidth: number = 2
+) => {
+  return (
+    <View style={{ position: 'relative', width: size, height: size }}>
+      {/* Stroke layer - slightly larger icons in 4 directions */}
+      <View style={{ position: 'absolute', top: -strokeWidth/2, left: 0 }}>
+        {getIconComponent(iconName, size, strokeColor)}
+      </View>
+      <View style={{ position: 'absolute', top: strokeWidth/2, left: 0 }}>
+        {getIconComponent(iconName, size, strokeColor)}
+      </View>
+      <View style={{ position: 'absolute', top: 0, left: -strokeWidth/2 }}>
+        {getIconComponent(iconName, size, strokeColor)}
+      </View>
+      <View style={{ position: 'absolute', top: 0, left: strokeWidth/2 }}>
+        {getIconComponent(iconName, size, strokeColor)}
+      </View>
+      {/* Fill layer on top */}
+      <View style={{ position: 'absolute', top: 0, left: 0 }}>
+        {getIconComponent(iconName, size, fillColor)}
+      </View>
+    </View>
+  );
 };
 
 // Valor por defecto

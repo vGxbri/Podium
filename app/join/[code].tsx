@@ -2,17 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-    Alert,
-    StyleSheet,
-    View,
+  StyleSheet,
+  View
 } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Surface,
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  Card,
+  Surface,
+  Text,
+  useTheme,
 } from "react-native-paper";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { defaultGroupIcon, getIconComponent, IconName } from "../../constants/icons";
@@ -20,6 +19,8 @@ import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
 import { groupsService } from "../../services";
 import { Group } from "../../types/database";
+
+import { DialogType } from "../../components/ui/ConfirmDialog";
 
 type JoinState = "loading" | "preview" | "joining" | "success" | "error" | "already_member";
 
@@ -32,6 +33,25 @@ export default function JoinGroupScreen() {
   const [state, setState] = useState<JoinState>("loading");
   const [group, setGroup] = useState<Group | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: DialogType;
+    confirmText?: string;
+    cancelText?: string;
+    showCancel?: boolean;
+    onConfirm: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: () => {},
+  });
+
+  const hideDialog = () => setDialogConfig(prev => ({ ...prev, visible: false }));
 
   const loadGroupPreview = useCallback(async () => {
     try {
@@ -67,14 +87,16 @@ export default function JoinGroupScreen() {
 
   const handleJoin = async () => {
     if (!isAuthenticated) {
-      Alert.alert(
-        "Inicia sesión",
-        "Necesitas iniciar sesión para unirte a un grupo",
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: "Iniciar Sesión", onPress: () => router.push("/auth/login") }
-        ]
-      );
+      setDialogConfig({
+        visible: true,
+        title: "Inicia sesión",
+        message: "Necesitas iniciar sesión para unirte a un grupo",
+        type: "info",
+        confirmText: "Iniciar Sesión",
+        cancelText: "Cancelar",
+        onConfirm: () => router.push("/auth/login"),
+        showCancel: true // Ensure cancel button is shown
+      });
       return;
     }
 

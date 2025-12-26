@@ -18,10 +18,10 @@ export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
   
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      <Card mode="elevated" style={styles.card}>
+      <Card mode="elevated" style={[styles.card, { borderColor: theme.colors.secondaryContainer, borderWidth: 1, }]}>
         <Card.Content style={styles.row}>
-          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-            {getIconComponent(iconName, 24, theme.colors.primary)}
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]} elevation={0}>
+            {getIconComponent(iconName, 24, theme.colors.onSurface)}
           </Surface>
           
           <View style={styles.content}>
@@ -29,14 +29,14 @@ export const GroupCard: React.FC<GroupCardProps> = ({ group, onPress }) => {
               {group.name}
             </Text>
             <View style={styles.metaRow}>
-              <Ionicons name="people" size={14} color={theme.colors.onSurfaceVariant} />
+              <Ionicons name="people" size={14} color={theme.colors.onSurface} />
               <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
                 {group.member_count} miembros
               </Text>
               {awardCount > 0 && (
                 <>
                   <View style={[styles.dot, { backgroundColor: theme.colors.outline }]} />
-                  <Ionicons name="trophy" size={14} color="#FFD700" />
+                  <Ionicons name="trophy" size={14} color={theme.colors.onSurface} />
                   <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
                     {awardCount} premios
                   </Text>

@@ -8,12 +8,15 @@ export default function HomeStackLayout() {
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.secondaryContainer, // Almost black
         },
         headerTintColor: theme.colors.primary,
         headerTitleStyle: {
-          fontWeight: "600",
+          fontWeight: "800",
+          fontSize: 24,
         },
+        headerShadowVisible: true,
+        animation: "fade", // Consistent fade transition
         contentStyle: {
           backgroundColor: theme.colors.background,
         },
@@ -22,11 +25,7 @@ export default function HomeStackLayout() {
       <Stack.Screen
         name="index"
         options={{
-          headerTitle: "Podium",
-          headerTitleStyle: {
-            fontWeight: "700",
-            fontSize: 24,
-          },
+          headerShown: false, // No navbar on main home page
         }}
       />
       <Stack.Screen

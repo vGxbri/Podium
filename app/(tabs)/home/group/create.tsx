@@ -1,31 +1,33 @@
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from "react-native";
 import {
-  Button,
-  Card,
-  Surface,
-  Text,
-  TextInput,
-  useTheme,
+    Button,
+    Card,
+    Surface,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { defaultGroupIcon, getIconComponent, groupIconOptions, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { groupsService } from "../../../../services";
 
+import { useSnackbar } from "../../../../components/ui/SnackbarContext";
+
 export default function CreateGroupScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIcon, setSelectedIcon] = useState<IconName>(defaultGroupIcon);
@@ -50,7 +52,7 @@ export default function CreateGroupScreen() {
     } catch (err) {
       console.error("Error creating group:", err);
       const message = err instanceof Error ? err.message : "Error al crear el grupo";
-      Alert.alert("Error", message);
+      showSnackbar(message, "error");
     } finally {
       setLoading(false);
     }

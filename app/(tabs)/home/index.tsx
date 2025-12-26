@@ -2,15 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React from "react";
 import {
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View
 } from "react-native";
 import {
   ActivityIndicator,
   Button,
-  Card,
   FAB,
   Surface,
   Text,
@@ -18,7 +19,6 @@ import {
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GroupCard } from "../../../components/GroupCard";
-import { theme as appTheme } from "../../../constants/theme";
 import { useAuth, useGroups } from "../../../hooks";
 
 export default function HomeScreen() {
@@ -48,15 +48,32 @@ export default function HomeScreen() {
   const totalAwards = groups.reduce((acc, g) => acc + (g.awards?.length || 0), 0);
   const totalMembers = groups.reduce((acc, g) => acc + (g.member_count || 0), 0);
 
-  const displayName = profile?.display_name?.split(' ')[0] || 'Usuario';
+  const displayName = profile?.display_name?.split(' ')[0] || 'Campeón';
+
+  const StatCard = ({ label, value, icon }: { label: string; value: number | string; icon: string }) => (
+    <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.secondaryContainer, borderWidth: 1 }]} elevation={1}>
+      <View style={[styles.statIconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1  }]}>
+        <Ionicons name={icon as any} size={22} color={theme.colors.onSecondaryContainer} />
+      </View>
+      <View>
+        <Text variant="headlineMedium" style={{ fontWeight: "800", color: theme.colors.onSurface, lineHeight: 32 }}>
+          {value}
+        </Text>
+        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, fontWeight: "600", marginTop: 2 }}>
+          {label}
+        </Text>
+      </View>
+    </Surface>
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: 100 + insets.bottom }
+          { paddingBottom: 100 + insets.bottom, paddingTop: insets.top + 16 }
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -70,105 +87,91 @@ export default function HomeScreen() {
       >
         {/* Header Section */}
         <View style={styles.header}>
-          <Text variant="headlineMedium" style={{ fontWeight: "700" }}>
-            ¡Hola, {displayName}! 👋
-          </Text>
-          <Text variant="bodyLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-            Gestiona tus grupos y premios
-          </Text>
+          <View style={styles.headerTextContainer}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
+              Bienvenido de nuevo,
+            </Text>
+            <Text variant="headlineMedium" style={{ fontWeight: "800", letterSpacing: -0.5 }}>
+              {displayName}
+            </Text>
+          </View>
         </View>
 
         {/* Quick Stats */}
         <View style={styles.statsRow}>
-          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
-            <Text variant="headlineSmall" style={{ color: theme.colors.primary, fontWeight: "700" }}>
-              {totalGroups}
-            </Text>
-            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-              Grupos
-            </Text>
-          </Surface>
-          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
-            <Text variant="headlineSmall" style={{ color: theme.colors.primary, fontWeight: "700" }}>
-              {totalAwards}
-            </Text>
-            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-              Premios
-            </Text>
-          </Surface>
-          <Surface style={[styles.statCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
-            <Text variant="headlineSmall" style={{ color: theme.colors.primary, fontWeight: "700" }}>
-              {totalMembers}
-            </Text>
-            <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-              Amigos
-            </Text>
-          </Surface>
+          <StatCard label="Grupos" value={totalGroups} icon="people" />
+          <StatCard label="Premios" value={totalAwards} icon="trophy" />
+          <StatCard label="Amigos" value={totalMembers} icon="heart" />
         </View>
-
-        {/* Error State */}
-        {error && (
-          <Card style={styles.errorCard} mode="outlined">
-            <Card.Content style={styles.errorContent}>
-              <Ionicons name="warning-outline" size={24} color={theme.colors.error} />
-              <Text variant="bodyMedium" style={{ color: theme.colors.error, marginTop: 8 }}>
-                Error al cargar grupos
-              </Text>
-              <Button mode="text" onPress={refetch} style={{ marginTop: 8 }}>
-                Reintentar
-              </Button>
-            </Card.Content>
-          </Card>
-        )}
 
         {/* Groups Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+            <Text variant="titleLarge" style={{ fontWeight: "700" }}>
               Mis Grupos
             </Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Button mode="text" compact onPress={handleJoinGroup}>
-                + Unirme
-              </Button>
-            </View>
+            <TouchableOpacity onPress={handleJoinGroup} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ fontWeight: "600", color: theme.colors.tertiary, marginRight: 4, fontSize: 14 }}>
+                Unirse con código
+              </Text>
+              <Ionicons name="arrow-forward" size={14} color={theme.colors.tertiary} />
+            </TouchableOpacity>
           </View>
+
+          {/* Error State */}
+          {error && (
+            <Surface style={[styles.errorCard, { backgroundColor: theme.colors.errorContainer }]} elevation={0}>
+              <Ionicons name="warning-outline" size={24} color={theme.colors.error} />
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>
+                  No se pudieron cargar los grupos
+                </Text>
+                <TouchableOpacity onPress={refetch}>
+                  <Text style={{ color: theme.colors.error, fontWeight: "700", marginTop: 4 }}>
+                    Reintentar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Surface>
+          )}
 
           {isLoading && groups.length === 0 ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator size="large" />
+              <ActivityIndicator size="large" color={theme.colors.primary} />
               <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
-                Cargando grupos...
+                Sincronizando podios...
               </Text>
             </View>
           ) : groups.length === 0 ? (
-            <Card style={styles.emptyCard} mode="elevated">
-              <Card.Content style={styles.emptyContent}>
-                <Ionicons name="people-outline" size={48} color={theme.colors.onSurfaceVariant} />
-                <Text variant="titleMedium" style={{ marginTop: 16 }}>
-                  No tienes grupos aún
-                </Text>
-                <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: "center" }}>
-                  Crea tu primer grupo o únete a uno existente
-                </Text>
-                <View style={styles.emptyButtons}>
-                  <Button mode="contained" onPress={handleCreateGroup}>
-                    Crear Grupo
-                  </Button>
-                  <Button mode="outlined" onPress={handleJoinGroup}>
-                    Unirse con código
-                  </Button>
-                </View>
-              </Card.Content>
-            </Card>
+            <Surface style={styles.emptyCard} elevation={1}>
+              <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.surfaceVariant }]}>
+                 <Ionicons name="trophy-outline" size={48} color={theme.colors.primary} />
+              </View>
+              <Text variant="titleMedium" style={{ marginTop: 16, fontWeight: "700" }}>
+                Comienza tu legado
+              </Text>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: "center", maxWidth: 260, lineHeight: 20 }}>
+                Crea un grupo para empezar a nominar y premiar a tus amigos.
+              </Text>
+              <Button 
+                mode="contained" 
+                onPress={handleCreateGroup} 
+                style={{ marginTop: 24, borderRadius: 12 }}
+                contentStyle={{ paddingVertical: 6 }}
+              >
+                Crear mi primer grupo
+              </Button>
+            </Surface>
           ) : (
-            groups.map((group) => (
-              <GroupCard
-                key={group.id}
-                group={group}
-                onPress={() => handleGroupPress(group.id)}
-              />
-            ))
+            <View style={styles.groupsList}>
+              {groups.map((group) => (
+                <GroupCard
+                  key={group.id}
+                  group={group}
+                  onPress={() => handleGroupPress(group.id)}
+                />
+              ))}
+            </View>
           )}
         </View>
       </ScrollView>
@@ -177,7 +180,17 @@ export default function HomeScreen() {
       {groups.length > 0 && (
         <FAB
           icon="plus"
-          style={[styles.fab, { bottom: 24 + insets.bottom }]}
+          label={Platform.OS === 'ios' ? "Nuevo Grupo" : undefined}
+          style={[
+            styles.fab, 
+            { 
+                bottom: 24 + insets.bottom,
+                backgroundColor: theme.colors.primaryContainer,
+                borderColor: theme.colors.primary,
+                borderWidth: 1,
+            }
+          ]}
+          color={theme.colors.onPrimaryContainer}
           onPress={handleCreateGroup}
         />
       )}
@@ -189,63 +202,102 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  glowSpot: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+  },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: appTheme.spacing.lg,
+    paddingHorizontal: 20,
   },
   header: {
-    marginBottom: appTheme.spacing.lg,
-    gap: 4,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+    marginTop: 10,
+  },
+  headerTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logoContainer: {
+    width: 60,
+    height: 60,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
   },
   statsRow: {
     flexDirection: "row",
-    gap: appTheme.spacing.sm,
-    marginBottom: appTheme.spacing.xl,
+    gap: 12,
+    marginBottom: 32,
   },
   statCard: {
     flex: 1,
-    borderRadius: appTheme.borderRadius.lg,
-    padding: appTheme.spacing.md,
-    alignItems: "center",
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+  },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   section: {
-    marginBottom: appTheme.spacing.xl,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: appTheme.spacing.md,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   loadingState: {
     alignItems: "center",
-    padding: appTheme.spacing.xl,
+    padding: 40,
   },
   errorCard: {
-    marginBottom: appTheme.spacing.lg,
-  },
-  errorContent: {
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 16,
+    marginBottom: 16,
   },
   emptyCard: {
-    borderRadius: appTheme.borderRadius.lg,
-  },
-  emptyContent: {
+    borderRadius: 24,
+    padding: 32,
     alignItems: "center",
-    paddingVertical: appTheme.spacing.xl,
+    backgroundColor: 'rgba(255,255,255,0.05)', // Fallback / suble effect
   },
-  emptyButtons: {
-    flexDirection: "column",
-    gap: appTheme.spacing.md,
-    marginTop: appTheme.spacing.lg,
-    width: '90%',
-    maxWidth: 280,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  groupsList: {
+    gap: 16,
   },
   fab: {
     position: "absolute",
-    right: 24,
+    right: 20,
+    borderRadius: 16,
   },
 });
 

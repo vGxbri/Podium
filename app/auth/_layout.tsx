@@ -7,6 +7,7 @@ export default function AuthLayout() {
   return (
     <Stack
       screenOptions={{
+        animation: "fade", // Fade transition between auth screens
         headerStyle: {
           backgroundColor: theme.colors.surface,
         },
@@ -30,8 +31,8 @@ export default function AuthLayout() {
       <Stack.Screen
         name="register"
         options={{
-          title: "Registro",
-          headerBackTitle: "Volver",
+          title: "",
+          headerShown: false, // Hide header for consistency
         }}
       />
     </Stack>

@@ -1,52 +1,46 @@
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import React, { useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Divider,
-    List,
-    Surface,
-
-    Text,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  Card,
+  Divider,
+  List,
+  Text,
+  useTheme
 } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MemberAvatar } from "../../components/MemberAvatar";
+import { useSnackbar } from "../../components/ui/SnackbarContext";
 import { theme as appTheme } from "../../constants/theme";
 import { useAuth, useGroups } from "../../hooks";
 
 export default function ProfileScreen() {
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { profile, isLoading: authLoading, signOut, isAuthenticated } = useAuth();
   const { groups, isLoading: groupsLoading } = useGroups();
+  const { showSnackbar } = useSnackbar();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const totalGroups = groups.length;
   const totalAwards = groups.reduce((acc, g) => acc + (g.awards?.length || 0), 0);
 
   const handleSignOut = async () => {
-    Alert.alert(
-      "Cerrar Sesión",
-      "¿Estás seguro de que quieres cerrar sesión?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Cerrar Sesión", 
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await signOut();
-              router.replace("/auth/login");
-            } catch {
-              Alert.alert("Error", "No se pudo cerrar sesión");
-            }
-          }
-        },
-      ]
-    );
+    setShowLogoutDialog(true);
+  };
+
+  const confirmSignOut = async () => {
+    try {
+      await signOut();
+      router.replace("/auth/login");
+    } catch {
+      showSnackbar("No se pudo cerrar sesión", "error");
+    }
   };
 
   // Loading state
@@ -84,8 +78,12 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={["left", "right"]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 50, paddingBottom: 100 + insets.bottom }
+        ]}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={false}
       >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -103,77 +101,97 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Stats */}
-        <Surface style={[styles.statsCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              {groupsLoading ? (
-                <ActivityIndicator size="small" />
-              ) : (
-                <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: "700" }}>
-                  {totalGroups}
-                </Text>
-              )}
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                Grupos
-              </Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.colors.outline }]} />
-            <View style={styles.stat}>
-              {groupsLoading ? (
-                <ActivityIndicator size="small" />
-              ) : (
-                <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: "700" }}>
-                  {totalAwards}
-                </Text>
-              )}
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                Premios
-              </Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: theme.colors.outline }]} />
-            <View style={styles.stat}>
-              <Text variant="headlineMedium" style={{ color: theme.colors.primary, fontWeight: "700" }}>
-                0
-              </Text>
-              <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                Ganados
-              </Text>
-            </View>
-          </View>
-        </Surface>
-
         {/* Settings Section */}
         <View style={styles.section}>
           <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
             Configuración
           </Text>
 
-          <Card mode="outlined">
+          <Card mode="outlined" style={{ borderColor: theme.colors.secondaryContainer, borderWidth: 1 }}>
             <List.Item
               title="Notificaciones"
-              left={(props) => <List.Icon {...props} icon="bell-outline" />}
+              left={() => (
+                <View style={{ marginLeft: 16, marginRight: 8 }}>
+                  <View style={{ 
+                    backgroundColor: theme.colors.primaryContainer, 
+                    borderColor: theme.colors.primary, 
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Ionicons name="notifications-outline" size={22} color={theme.colors.onSurface} />
+                  </View>
+                </View>
+              )}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {}}
             />
             <Divider />
             <List.Item
               title="Apariencia"
-              left={(props) => <List.Icon {...props} icon="palette-outline" />}
+              left={() => (
+                <View style={{ marginLeft: 16, marginRight: 8 }}>
+                  <View style={{ 
+                    backgroundColor: theme.colors.primaryContainer, 
+                    borderColor: theme.colors.primary, 
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Ionicons name="color-palette-outline" size={22} color={theme.colors.onSurface} />
+                  </View>
+                </View>
+              )}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {}}
             />
             <Divider />
             <List.Item
               title="Privacidad"
-              left={(props) => <List.Icon {...props} icon="lock-outline" />}
+              left={() => (
+                <View style={{ marginLeft: 16, marginRight: 8 }}>
+                  <View style={{ 
+                    backgroundColor: theme.colors.primaryContainer, 
+                    borderColor: theme.colors.primary, 
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Ionicons name="lock-closed-outline" size={22} color={theme.colors.onSurface} />
+                  </View>
+                </View>
+              )}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {}}
             />
             <Divider />
             <List.Item
               title="Ayuda"
-              left={(props) => <List.Icon {...props} icon="help-circle-outline" />}
+              left={() => (
+                <View style={{ marginLeft: 16, marginRight: 8 }}>
+                  <View style={{ 
+                    backgroundColor: theme.colors.primaryContainer, 
+                    borderColor: theme.colors.primary, 
+                    borderWidth: 1,
+                    borderRadius: 8,
+                    width: 40,
+                    height: 40,
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                  }}>
+                    <Ionicons name="help-circle-outline" size={22} color={theme.colors.onSurface} />
+                  </View>
+                </View>
+              )}
               right={(props) => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => {}}
             />
@@ -194,6 +212,17 @@ export default function ProfileScreen() {
           Podium v1.0.0
         </Text>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={showLogoutDialog}
+        title="Cerrar Sesión"
+        message="¿Estás seguro de que quieres cerrar sesión?"
+        type="error"
+        confirmText="Cerrar Sesión"
+        cancelText="Cancelar"
+        onConfirm={confirmSignOut}
+        onCancel={() => setShowLogoutDialog(false)}
+      />
     </SafeAreaView>
   );
 }

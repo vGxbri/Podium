@@ -1,7 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -23,11 +22,15 @@ import { defaultGroupIcon, getIconComponent, groupIconOptions, IconName } from "
 import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 
+import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
+import { useSnackbar } from "../../../../components/ui/SnackbarContext";
+
 export default function GroupSettingsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
   
   const { 
     group, 
@@ -41,6 +44,24 @@ export default function GroupSettingsScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [icon, setIcon] = useState<IconName>(defaultGroupIcon);
+  
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: DialogType;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm: () => void;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: () => {},
+  });
+
+  const hideDialog = () => setDialogConfig(prev => ({ ...prev, visible: false }));
   
   // Settings
   const [allowMemberNominations, setAllowMemberNominations] = useState(false);
@@ -62,7 +83,7 @@ export default function GroupSettingsScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Error", "El nombre del grupo es obligatorio");
+      showSnackbar("El nombre del grupo es obligatorio", "error");
       return;
     }
 
@@ -78,38 +99,34 @@ export default function GroupSettingsScreen() {
           require_approval: requireApproval,
         }
       });
-      Alert.alert("Éxito", "Grupo actualizado correctamente");
+      showSnackbar("Grupo actualizado correctamente", "success");
       router.back();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "No se pudo actualizar el grupo");
+      showSnackbar(error.message || "No se pudo actualizar el grupo", "error");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Eliminar Grupo",
-      "¿Estás seguro? Esta acción eliminará el grupo y todos sus datos permanentemente.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setSaving(true);
-              await deleteGroup();
-              router.dismissAll();
-              router.replace("/(tabs)/home");
-            } catch {
-              setSaving(false);
-              Alert.alert("Error", "No se pudo eliminar el grupo");
-            }
-          }
+    setDialogConfig({
+      visible: true,
+      title: "Eliminar Grupo",
+      message: "¿Estás seguro? Esta acción eliminará el grupo y todos sus datos permanentemente.",
+      type: "error",
+      confirmText: "Eliminar",
+      onConfirm: async () => {
+        try {
+          setSaving(true);
+          await deleteGroup();
+          router.dismissAll();
+          router.replace("/(tabs)/home");
+        } catch {
+          setSaving(false);
+          showSnackbar("No se pudo eliminar el grupo", "error");
         }
-      ]
-    );
+      }
+    });
   };
 
   if (isLoading) {
@@ -274,6 +291,17 @@ export default function GroupSettingsScreen() {
           </View>
         </KeyboardAvoidingView>
       </View>
+      <ConfirmDialog
+        visible={dialogConfig.visible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        type={dialogConfig.type}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        onConfirm={dialogConfig.onConfirm}
+        onCancel={hideDialog}
+        showCancel={true}
+      />
     </>
   );
 }

@@ -2,13 +2,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
     StyleSheet,
     TouchableOpacity,
-    View,
+    View
 } from "react-native";
 import {
     ActivityIndicator,
@@ -36,11 +35,14 @@ const VOTE_TYPE_OPTIONS: { value: VoteType; label: string; icon: string }[] = [
   { value: 'text', label: 'Texto', icon: 'document-text' },
 ];
 
+import { useSnackbar } from "../../../../components/ui/SnackbarContext";
+
 export default function CreateAwardScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
   
   const { group, isLoading: groupLoading } = useGroup(groupId);
   
@@ -107,7 +109,7 @@ export default function CreateAwardScreen() {
       router.back();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al crear el premio";
-      Alert.alert("Error", message);
+      showSnackbar(message, "error");
     } finally {
       setLoading(false);
     }

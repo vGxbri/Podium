@@ -8,14 +8,12 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from 'expo-video';
 import React, { useCallback, useState } from "react";
 import {
-  Alert,
   Modal,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
-
 import {
   ActivityIndicator,
   Button,
@@ -29,11 +27,15 @@ import {
   useTheme,
 } from "react-native-paper";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
+import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
+import { useSnackbar } from "../../../../components/ui/SnackbarContext";
 import { defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
 import { theme as appTheme } from "../../../../constants/theme";
 import { useAuth, useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
 import { AwardWithNominees } from "../../../../types/database";
+
+// ... constants ...
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "";
@@ -49,6 +51,7 @@ export default function AwardDetailScreen() {
   const { id, groupId } = useLocalSearchParams<{ id: string; groupId: string }>();
   const router = useRouter();
   const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
   
   const { group, isAdmin } = useGroup(groupId);
   const { user } = useAuth();
@@ -58,7 +61,31 @@ export default function AwardDetailScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   
   const [myVote, setMyVote] = useState<string | null>(null);
+
+  // Dialog State
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: DialogType;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
+    showCancel?: boolean;
+  }>({
+    visible: false,
+    title: "",
+    message: "",
+    type: "info",
+    onConfirm: () => {},
+    showCancel: true,
+  });
+
+  const hideDialog = () => setDialogConfig(prev => ({ ...prev, visible: false }));
+
   
+
+
   const [showStartVotingModal, setShowStartVotingModal] = useState(false);
   const [deadlineMode, setDeadlineMode] = useState<'24h' | '48h' | '1w' | 'custom'>('24h');
   const [customDate, setCustomDate] = useState("");
@@ -85,7 +112,7 @@ export default function AwardDetailScreen() {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "No se pudo cargar el premio");
+      showSnackbar("No se pudo cargar el premio", "error");
     } finally {
       setLoading(false);
     }
@@ -115,14 +142,14 @@ export default function AwardDetailScreen() {
         const [hour, minute] = timePart.split(':').map(Number);
         
         if (!day || !month || !year || isNaN(hour) || isNaN(minute)) {
-          Alert.alert("Error", "Formato de fecha inválido. Usa DD/MM/YYYY y HH:MM");
+          showSnackbar("Formato de fecha inválido. Usa DD/MM/YYYY y HH:MM", "error");
           return;
         }
         
         deadlineDate = new Date(year, month - 1, day, hour, minute);
         
         if (deadlineDate <= new Date()) {
-          Alert.alert("Error", "La fecha debe ser futura");
+          showSnackbar("La fecha debe ser futura", "error");
           return;
         }
       }
@@ -131,7 +158,7 @@ export default function AwardDetailScreen() {
       
       // Validation: Minimum 2 nominees/photos required
       if (award.nominees.length < 2) {
-        Alert.alert("No se puede iniciar", "Se necesitan mínimo 2 candidatos para empezar la votación");
+        showSnackbar("Se necesitan mínimo 2 candidatos para empezar la votación", "error");
         return;
       }
 
@@ -141,7 +168,7 @@ export default function AwardDetailScreen() {
       fetchAward();
       
     } catch {
-      Alert.alert("Error", "No se pudo iniciar la votación");
+      showSnackbar("No se pudo iniciar la votación", "error");
     } finally {
       setActionLoading(false);
     }
@@ -154,10 +181,10 @@ export default function AwardDetailScreen() {
       setActionLoading(true);
       await awardsService.vote(award.id, nomineeId);
       setMyVote(nomineeId);
-      Alert.alert("Éxito", "Tu voto ha sido registrado");
+      showSnackbar("Tu voto ha sido registrado", "success");
       fetchAward();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "No se pudo registrar el voto");
+      showSnackbar(error.message || "No se pudo registrar el voto", "error");
     } finally {
       setActionLoading(false);
     }
@@ -166,79 +193,68 @@ export default function AwardDetailScreen() {
   const handleFinishVoting = async () => {
     if (!award) return;
     
-    Alert.alert(
-      "Finalizar Votación",
-      "¿Estás seguro? Se cerrará la votación y se decidirá el ganador.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Finalizar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              await awardsService.declareWinner(award.id);
-              fetchAward();
-            } catch (error: any) {
-              Alert.alert("Error", error.message || "Error al finalizar");
-            } finally {
-              setActionLoading(false);
-            }
-          }
+    setDialogConfig({
+      visible: true,
+      title: "Finalizar Votación",
+      message: "¿Estás seguro? Se cerrará la votación y se decidirá el ganador.",
+      type: "confirm",
+      confirmText: "Finalizar",
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          await awardsService.declareWinner(award.id);
+          fetchAward();
+        } catch (error: any) {
+          showSnackbar(error.message || "Error al finalizar", "error");
+        } finally {
+          setActionLoading(false);
         }
-      ]
-    );
+      }
+    });
   };
 
   const handleRevealWinner = async () => {
     if (!award) return;
 
-    Alert.alert(
-      "Revelar Ganador",
-      "¿Quieres mostrar el ganador a todos los miembros?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Revelar",
-          onPress: async () => {
-             try {
-               setActionLoading(true);
-               await awardsService.revealWinner(award.id);
-               fetchAward();
-             } catch {
-               Alert.alert("Error", "No se pudo revelar el ganador");
-             } finally {
-               setActionLoading(false);
-             }
-          }
-        }
-      ]
-    );
+    setDialogConfig({
+      visible: true,
+      title: "Revelar Ganador",
+      message: "¿Quieres mostrar el ganador a todos los miembros?",
+      type: "confirm",
+      confirmText: "Revelar",
+      onConfirm: async () => {
+         try {
+           setActionLoading(true);
+           await awardsService.revealWinner(award.id);
+           fetchAward();
+         } catch {
+           showSnackbar("No se pudo revelar el ganador", "error");
+         } finally {
+           setActionLoading(false);
+         }
+      }
+    });
   };
 
   const handleDelete = async () => {
     if (!award) return;
 
-    Alert.alert(
-      "Eliminar Premio",
-      "¿Estás seguro? Esta acción no se puede deshacer.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Eliminar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              await awardsService.deleteAward(award.id);
-              router.back();
-            } catch {
-              Alert.alert("Error", "No se pudo eliminar");
-            }
-          }
+    setDialogConfig({
+      visible: true,
+      title: "Eliminar Premio",
+      message: "¿Estás seguro? Esta acción no se puede deshacer.",
+      type: "error",
+      confirmText: "Eliminar",
+      onConfirm: async () => {
+        try {
+          setActionLoading(true);
+          await awardsService.deleteAward(award.id);
+          router.back();
+        } catch {
+          showSnackbar("No se pudo eliminar", "error");
         }
-      ]
-    );
+      }
+    });
   };
 
   const handleAddNomineeWithPhoto = async () => {
@@ -270,7 +286,7 @@ export default function AwardDetailScreen() {
          const validAudioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.flac', '.ogg', '.wma'];
          
          if (!validAudioExtensions.some(ext => assetNameLower.endsWith(ext))) {
-            Alert.alert("Formato no válido", "Por favor selecciona un archivo de audio válido (.mp3, .wav, .m4a, etc.)");
+            showSnackbar("Por favor selecciona un archivo de audio válido (.mp3, .wav, .m4a, etc.)", "error");
             return;
          }
 
@@ -307,12 +323,12 @@ export default function AwardDetailScreen() {
       let typeLabel = 'Foto';
       if (isVideo) typeLabel = 'Vídeo';
 
-      Alert.alert("Éxito", `${typeLabel} añadida correctamente`);
+      showSnackbar(`${typeLabel} añadida correctamente`, "success");
       fetchAward();
 
     } catch (error: any) {
       console.error(error);
-      Alert.alert("Error", error.message || "No se pudo subir");
+      showSnackbar(error.message || "No se pudo subir", "error");
     } finally {
       setActionLoading(false);
     }
@@ -321,7 +337,7 @@ export default function AwardDetailScreen() {
   const handleSubmitAudioNomination = async () => {
     if (!tempAudio || !award || !user) return;
     if (!audioTitle.trim()) {
-        Alert.alert("Error", "Por favor añade un título al audio");
+        showSnackbar("Por favor añade un título al audio", "error");
         return;
     }
 
@@ -333,13 +349,13 @@ export default function AwardDetailScreen() {
         // Add nominee with Reason = Title
         await awardsService.addNominee(award.id, user.id, audioTitle, publicUrl);
 
-        Alert.alert("Éxito", "Audio añadido correctamente");
+        showSnackbar("Audio añadido correctamente", "success");
         setShowAudioTitleModal(false);
         setTempAudio(null);
         setAudioTitle("");
         fetchAward();
     } catch (error: any) {
-        Alert.alert("Error", error.message);
+        showSnackbar(error.message, "error");
     } finally {
         setActionLoading(false);
     }
@@ -351,12 +367,12 @@ export default function AwardDetailScreen() {
     try {
       setActionLoading(true);
       await awardsService.addNominee(award.id, user.id, undefined, textNomination);
-      Alert.alert("Éxito", "Texto añadido correctamente");
+      showSnackbar("Texto añadido correctamente", "success");
       setShowTextModal(false);
       setTextNomination("");
       fetchAward();
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      showSnackbar(error.message, "error");
     } finally {
       setActionLoading(false);
     }
@@ -683,6 +699,17 @@ export default function AwardDetailScreen() {
         </Dialog>
       </Portal>
 
+      <ConfirmDialog
+        visible={dialogConfig.visible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        type={dialogConfig.type}
+        confirmText={dialogConfig.confirmText}
+        cancelText={dialogConfig.cancelText}
+        onConfirm={dialogConfig.onConfirm}
+        onCancel={hideDialog}
+        showCancel={dialogConfig.showCancel}
+      />
     </>
   );
 }
