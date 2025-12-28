@@ -26,6 +26,7 @@ import {
   TextInput,
   useTheme
 } from "react-native-paper";
+
 import { MemberAvatar } from "../../../../components/MemberAvatar";
 import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
 import { MemberSelectMenu } from "../../../../components/ui/MemberSelectMenu";

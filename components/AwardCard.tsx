@@ -158,11 +158,28 @@ export const AwardCard: React.FC<AwardCardProps> = ({ award, nomineeCount, onPre
         </View>
 
         {/* Progress indicator for voting */}
-        {award.status === 'voting' && (
-          <View style={[styles.progressBar, { backgroundColor: theme.colors.surfaceVariant }]}>
-            <View style={[styles.progressFill, { backgroundColor: '#F59E0B', width: '60%' }]} />
-          </View>
-        )}
+        {award.status === 'voting' && (() => {
+          const now = new Date().getTime();
+          const start = award.voting_start_at ? new Date(award.voting_start_at).getTime() : now;
+          const end = award.voting_end_at ? new Date(award.voting_end_at).getTime() : now + 24 * 60 * 60 * 1000;
+          
+          const totalDuration = end - start;
+          const timeRemaining = Math.max(0, end - now);
+          
+          // If duration is 0 or negative, default to 0. 
+          // Otherwise calculate percentage remaining.
+          // Start -> Remaining = Total -> 100%
+          // End -> Remaining = 0 -> 0%
+          const progressPercent = totalDuration > 0 
+            ? Math.min(100, Math.max(0, (timeRemaining / totalDuration) * 100)) 
+            : 0;
+
+          return (
+            <View style={[styles.progressBar, { backgroundColor: theme.colors.surfaceVariant }]}>
+              <View style={[styles.progressFill, { backgroundColor: '#F59E0B', width: `${progressPercent}%` }]} />
+            </View>
+          );
+        })()}
 
         {/* Chevron */}
         <View style={styles.chevronContainer}>

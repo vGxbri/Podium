@@ -1,19 +1,21 @@
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { Button, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useSnackbar } from "../../components/ui/SnackbarContext";
 import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
+import { supabase } from "../../lib/supabase";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -26,6 +28,48 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  React.useEffect(() => {
+    try {
+      GoogleSignin.configure({
+        webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+        scopes: ['email', 'profile'],
+      });
+    } catch (e) {
+      console.error('GS Configure Error', e);
+    }
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      await GoogleSignin.hasPlayServices();
+      const userInfo: any = await GoogleSignin.signIn();
+      const idToken = userInfo.data?.idToken || userInfo.idToken;
+
+      if (idToken) {
+        const { error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: idToken,
+        });
+        if (error) throw error;
+        router.replace("/");
+      } else {
+        throw new Error('No token found');
+      }
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // cancelled
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        showSnackbar("Google Play Services no disponible", "error");
+      } else {
+        console.error(error);
+        showSnackbar(error.message || "Error Google Login", "error");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -150,10 +194,22 @@ export default function LoginScreen() {
           <View style={styles.divider}>
             <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
             <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, paddingHorizontal: 12 }}>
-              o
+              o continúa con
             </Text>
             <View style={[styles.dividerLine, { backgroundColor: theme.colors.outlineVariant }]} />
           </View>
+
+          <Button
+            mode="outlined"
+            onPress={handleGoogleLogin}
+            loading={loading}
+            icon="google"
+            style={[styles.button, { marginBottom: 24, marginTop: 0, borderColor: theme.colors.outline }]}
+            textColor={theme.colors.onSurface}
+            labelStyle={styles.buttonLabel}
+          >
+            Google
+          </Button>
 
           {/* Footer */}
           <View style={styles.footer}>

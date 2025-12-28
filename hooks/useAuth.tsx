@@ -1,3 +1,4 @@
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -120,6 +121,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const signOut = async () => {
+    try {
+      await GoogleSignin.signOut();
+    } catch (e) {
+      // Ignore error if not logged in with Google
+    }
     await authService.signOut();
     setSession(null);
     setUser(null);
