@@ -155,7 +155,7 @@ export const awardsService = {
     const updates: Partial<Award> = { status };
     
     if (status === 'voting' && votingEndsAt) {
-      updates.voting_ends_at = votingEndsAt;
+      updates.voting_end_at = votingEndsAt;
     }
     
     if (status === 'completed') {
@@ -237,7 +237,7 @@ export const awardsService = {
       if (checkError) throw checkError;
 
       if (nomineeCheck) {
-        throw new Error('No puedes votar en un premio donde estás nominado');
+        throw new Error('No puedes votar en un premio donde estás nominado.');
       }
     }
 
@@ -252,7 +252,7 @@ export const awardsService = {
 
     if (error) {
       if (error.code === '23505') { // Unique violation
-        throw new Error('You have already voted for this award');
+        throw new Error('Ya has votado para este premio.');
       }
       throw error;
     }
@@ -288,37 +288,61 @@ export const awardsService = {
       .from('nominees')
       .select('*')
       .eq('award_id', awardId)
-      .order('vote_count', { ascending: false })
-      .limit(1);
+      .order('vote_count', { ascending: false });
 
     if (nomineesError) throw nomineesError;
 
     if (!nominees || nominees.length === 0) {
-      throw new Error('No nominees found');
+      throw new Error('No se han encontrado nominados.');
     }
 
-    const winner = nominees[0];
+    // Find max votes
+    const maxVotes = Math.max(...nominees.map(n => Number(n.vote_count) || 0));
 
-    // Update nominee as winner
-    await supabase
-      .from('nominees')
-      .update({ is_winner: true })
-      .eq('id', winner.id);
+    // Check if there are valid votes
+    if (maxVotes > 0) {
+      // Find all winners
+      const winners = nominees.filter(n => (Number(n.vote_count) || 0) === maxVotes);
+      const winnerIds = winners.map(n => n.id);
 
-    // Update award with winner
-    const { data, error } = await supabase
-      .from('awards')
-      .update({
-        winner_id: winner.user_id,
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', awardId)
-      .select()
-      .single();
+      // Update all winners
+      const { error: updateError } = await supabase
+        .from('nominees')
+        .update({ is_winner: true })
+        .in('id', winnerIds);
+        
+      if (updateError) throw updateError;
 
-    if (error) throw error;
-    return data;
+      // Update award with one of the winners (just to confirm completion)
+      const { data, error } = await supabase
+        .from('awards')
+        .update({
+          winner_id: winners[0].user_id,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', awardId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } else {
+      // No votes - Award Deserted
+      const { data, error } = await supabase
+        .from('awards')
+        .update({
+          winner_id: null,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', awardId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
   },
 
   /**
@@ -401,5 +425,16 @@ export const awardsService = {
       .getPublicUrl(filePath);
 
     return data.publicUrl;
+  },
+  
+  /**
+   * Check if award invalid and expire it if needed
+   */
+  async checkExpiration(awardId: string): Promise<void> {
+    const { error } = await supabase.rpc('check_award_expiration', { 
+      check_award_id: awardId 
+    });
+    
+    if (error) throw error;
   },
 };

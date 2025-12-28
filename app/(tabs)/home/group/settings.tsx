@@ -1,25 +1,25 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import {
-  ActivityIndicator,
-  Button,
-  Card,
-  Switch,
-  Text,
-  TextInput,
-  useTheme,
+    ActivityIndicator,
+    Button,
+    Surface,
+    Switch,
+    Text,
+    TextInput,
+    useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { defaultGroupIcon, getIconComponent, groupIconOptions, IconName } from "../../../../constants/icons";
-import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 
 import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
@@ -65,10 +65,14 @@ export default function GroupSettingsScreen() {
   
   // Settings
   const [allowMemberNominations, setAllowMemberNominations] = useState(false);
-  const [allowMemberVoting, setAllowMemberVoting] = useState(false);
-  const [requireApproval, setRequireApproval] = useState(false);
+  const [allowMemberVoting, setAllowMemberVoting] = useState(true);
 
   const [saving, setSaving] = useState(false);
+
+  const withOpacity = (color: string, opacity: number) => {
+    const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
+    return color + alpha;
+  };
 
   useEffect(() => {
     if (group) {
@@ -77,7 +81,6 @@ export default function GroupSettingsScreen() {
       setIcon((group.icon as IconName) || defaultGroupIcon);
       setAllowMemberNominations(group.settings.allow_member_nominations);
       setAllowMemberVoting(group.settings.allow_member_voting);
-      setRequireApproval(group.settings.require_approval);
     }
   }, [group]);
 
@@ -94,9 +97,9 @@ export default function GroupSettingsScreen() {
         description: description.trim() || null,
         icon,
         settings: {
+          ...group?.settings, // Keep other settings like max_members
           allow_member_nominations: allowMemberNominations,
           allow_member_voting: allowMemberVoting,
-          require_approval: requireApproval,
         }
       });
       showSnackbar("Grupo actualizado correctamente", "success");
@@ -133,6 +136,9 @@ export default function GroupSettingsScreen() {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" />
+        <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
+          Cargando...
+        </Text>
       </View>
     );
   }
@@ -140,10 +146,33 @@ export default function GroupSettingsScreen() {
   if (!group || !isAdmin) {
     return (
       <View style={[styles.centerContainer, { backgroundColor: theme.colors.background }]}>
-        <Text variant="bodyLarge">No tienes permisos para ver esta pantalla</Text>
+        <Ionicons name="lock-closed-outline" size={48} color={theme.colors.onSurfaceVariant} />
+        <Text variant="bodyLarge" style={{ marginVertical: 16, color: theme.colors.onSurfaceVariant }}>
+          No tienes permisos para ver esta pantalla
+        </Text>
+        <Button mode="contained" onPress={() => router.back()}>Volver</Button>
       </View>
     );
   }
+
+  const SETTINGS_OPTIONS = [
+    {
+      key: 'nominations',
+      icon: 'trophy-outline',
+      title: 'Permitir crear premios',
+      description: 'Los miembros no administradores pueden crear premios',
+      value: allowMemberNominations,
+      onChange: setAllowMemberNominations,
+    },
+    {
+      key: 'voting',
+      icon: 'checkmark-circle-outline',
+      title: 'Permitir votación',
+      description: 'Los miembros pueden votar en premios',
+      value: allowMemberVoting,
+      onChange: setAllowMemberVoting,
+    },
+  ];
 
   return (
     <>
@@ -155,140 +184,241 @@ export default function GroupSettingsScreen() {
         >
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={[
-              styles.content,
-              { paddingBottom: appTheme.spacing.xl + insets.bottom }
-            ]}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {/* General Info */}
+            {/* Preview Card */}
+            <Surface 
+              style={[
+                styles.previewCard, 
+                { 
+                  backgroundColor: theme.colors.surface, 
+                  borderColor: theme.colors.secondaryContainer, 
+                  borderWidth: 1 
+                }
+              ]} 
+              elevation={1}
+            >
+              <View style={[styles.previewIconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]}>
+                {getIconComponent(icon, 32, theme.colors.onSurface)}
+              </View>
+              <Text variant="titleLarge" style={{ fontWeight: "700", marginTop: 12, textAlign: 'center' }}>
+                {name.trim() || "Nombre del grupo"}
+              </Text>
+              {description.trim() ? (
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: 'center' }}>
+                  {description}
+                </Text>
+              ) : null}
+            </Surface>
+
+            {/* Icon Selector */}
             <View style={styles.section}>
-              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 16 }}>
-                Información General
+              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+                Elige un icono
+              </Text>
+              <Surface 
+                style={[
+                  styles.iconGridCard, 
+                  { 
+                    backgroundColor: theme.colors.surface, 
+                    borderColor: theme.colors.secondaryContainer, 
+                    borderWidth: 1 
+                  }
+                ]} 
+                elevation={1}
+              >
+                {groupIconOptions.map((iconName) => (
+                  <TouchableOpacity
+                    key={iconName}
+                    style={[
+                      styles.iconButton,
+                      { 
+                        backgroundColor: icon === iconName 
+                          ? theme.colors.primaryContainer 
+                          : 'transparent',
+                        borderColor: icon === iconName 
+                          ? theme.colors.primary 
+                          : theme.colors.outlineVariant,
+                      },
+                    ]}
+                    onPress={() => setIcon(iconName)}
+                  >
+                    {getIconComponent(
+                      iconName, 
+                      24, 
+                      icon === iconName 
+                        ? theme.colors.onSurface 
+                        : withOpacity(theme.colors.onSurfaceVariant, 0.4)
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </Surface>
+            </View>
+
+            {/* Form Fields */}
+            <View style={styles.section}>
+              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+                Detalles
               </Text>
               
-              <View style={styles.iconSelector}>
-                <Text variant="labelLarge" style={{ marginBottom: 8 }}>Icono</Text>
-                <View style={styles.iconGrid}>
-                  {groupIconOptions.map((iconName) => (
-                    <TouchableOpacity
-                      key={iconName}
-                      style={[
-                        styles.iconOption,
-                        { 
-                          backgroundColor: icon === iconName ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                          borderColor: icon === iconName ? theme.colors.primary : 'transparent'
-                        }
-                      ]}
-                      onPress={() => setIcon(iconName)}
-                    >
-                      {getIconComponent(iconName, 24, icon === iconName ? theme.colors.primary : theme.colors.onSurfaceVariant)}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
               <TextInput
-                label="Nombre del Grupo"
+                label="Nombre del grupo"
+                placeholder="ej. Los Cracks"
                 value={name}
                 onChangeText={setName}
                 mode="outlined"
+                maxLength={30}
                 style={styles.input}
+                outlineStyle={{ borderRadius: 14 }}
+                left={<TextInput.Icon icon="account-group" />}
               />
 
               <TextInput
-                label="Descripción"
+                label="Descripción (opcional)"
+                placeholder="Describe tu grupo..."
                 value={description}
                 onChangeText={setDescription}
                 mode="outlined"
                 multiline
-                numberOfLines={3}
+                numberOfLines={2}
                 style={styles.input}
+                outlineStyle={{ borderRadius: 14 }}
+                left={<TextInput.Icon icon="text" />}
               />
             </View>
 
-            {/* Permissions / Settings */}
+            {/* Permissions Section */}
             <View style={styles.section}>
-              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 16 }}>
-                Permisos y Configuración
+              <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+                Permisos
               </Text>
-              
-              <Card mode="outlined" style={{ marginBottom: 8 }}>
-                <Card.Content style={styles.settingRow}>
-                  <View style={styles.settingInfo}>
-                    <Text variant="bodyLarge">Permitir nominaciones de miembros</Text>
-                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                      Los miembros pueden nominar a otros para premios
-                    </Text>
-                  </View>
-                  <Switch
-                    value={allowMemberNominations}
-                    onValueChange={setAllowMemberNominations}
-                  />
-                </Card.Content>
-              </Card>
-
-              <Card mode="outlined" style={{ marginBottom: 8 }}>
-                <Card.Content style={styles.settingRow}>
-                  <View style={styles.settingInfo}>
-                    <Text variant="bodyLarge">Permitir votación de miembros</Text>
-                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                      Los miembros pueden votar en los premios activos
-                    </Text>
-                  </View>
-                  <Switch
-                    value={allowMemberVoting}
-                    onValueChange={setAllowMemberVoting}
-                  />
-                </Card.Content>
-              </Card>
-
-              <Card mode="outlined">
-                <Card.Content style={styles.settingRow}>
-                  <View style={styles.settingInfo}>
-                    <Text variant="bodyLarge">Requerir aprobación</Text>
-                    <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                      Los nuevos miembros deben ser aprobados por un admin
-                    </Text>
-                  </View>
-                  <Switch
-                    value={requireApproval}
-                    onValueChange={setRequireApproval}
-                  />
-                </Card.Content>
-              </Card>
+              <Surface 
+                style={[
+                  styles.settingsCard, 
+                  { 
+                    backgroundColor: theme.colors.surface, 
+                    borderColor: theme.colors.secondaryContainer, 
+                    borderWidth: 1 
+                  }
+                ]} 
+                elevation={1}
+              >
+                {SETTINGS_OPTIONS.map((option, index) => {
+                  const isLast = index === SETTINGS_OPTIONS.length - 1;
+                  return (
+                    <TouchableOpacity
+                      key={option.key}
+                      style={[
+                        styles.settingRow,
+                        !isLast && { borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant }
+                      ]}
+                      onPress={() => option.onChange(!option.value)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[
+                        styles.settingIconContainer,
+                        { backgroundColor: theme.colors.primaryContainer }
+                      ]}>
+                        <Ionicons
+                          name={option.icon as any}
+                          size={18}
+                          color={theme.colors.onPrimaryContainer}
+                        />
+                      </View>
+                      <View style={styles.settingInfo}>
+                        <Text variant="bodyLarge" style={{ fontWeight: '500' }}>
+                          {option.title}
+                        </Text>
+                        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                          {option.description}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={option.value}
+                        onValueChange={option.onChange}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </Surface>
             </View>
 
             {/* Danger Zone */}
             {isOwner && (
-              <Card mode="outlined" style={[styles.dangerSection, { borderColor: theme.colors.error }]}>
-                <Card.Content>
-                  <Text variant="titleMedium" style={{ color: theme.colors.error, marginBottom: 12 }}>
-                    Zona de Peligro
-                  </Text>
+              <View style={styles.section}>
+                <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12, color: theme.colors.error }}>
+                  Zona de Peligro
+                </Text>
+                <Surface 
+                  style={[
+                    styles.dangerCard, 
+                    { 
+                      backgroundColor: theme.colors.errorContainer, 
+                      borderColor: theme.colors.error, 
+                      borderWidth: 1 
+                    }
+                  ]} 
+                  elevation={0}
+                >
+                  <View style={styles.dangerContent}>
+                    <Ionicons name="warning-outline" size={24} color={theme.colors.error} />
+                    <View style={styles.dangerInfo}>
+                      <Text variant="bodyLarge" style={{ fontWeight: '500', color: theme.colors.onSurface }}>
+                        Eliminar grupo
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: theme.colors.onSurface }}>
+                        Esta acción es irreversible
+                      </Text>
+                    </View>
+                  </View>
                   <Button
-                    mode="outlined"
+                    mode="contained"
                     onPress={handleDelete}
                     loading={saving}
-                    textColor={theme.colors.error}
-                    style={{ borderColor: theme.colors.error }}
+                    buttonColor={theme.colors.error}
+                    textColor={theme.colors.onSurface}
+                    style={{ borderRadius: 12, backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error, borderWidth: 1 }}
+                    contentStyle={{ paddingVertical: 4 }}
                   >
-                    Eliminar Grupo
+                    Eliminar
                   </Button>
-                </Card.Content>
-              </Card>
+                </Surface>
+              </View>
             )}
-
           </ScrollView>
 
-          <View style={[styles.footer, { paddingBottom: appTheme.spacing.lg + insets.bottom, backgroundColor: theme.colors.surface }]}>
+          {/* Footer */}
+          <Surface 
+            style={[
+              styles.footer, 
+              { 
+                paddingBottom: 8 + insets.bottom,
+                backgroundColor: theme.colors.surface,
+                borderTopEndRadius: 16,
+                borderTopStartRadius: 16,
+              }
+            ]} 
+            elevation={0}
+          >
             <Button
               mode="contained"
               onPress={handleSave}
               loading={saving}
+              disabled={!name.trim() || saving}
+              style={{ borderRadius: 14 }}
+              contentStyle={{ 
+                backgroundColor: theme.colors.primaryContainer, 
+                paddingVertical: 6,
+                borderColor: theme.colors.primary, 
+                borderWidth: 1, 
+                borderRadius: 16
+              }}
             >
               Guardar Cambios
             </Button>
-          </View>
+          </Surface>
         </KeyboardAvoidingView>
       </View>
       <ConfirmDialog
@@ -314,6 +444,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   keyboardView: {
     flex: 1,
@@ -322,48 +453,79 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: appTheme.spacing.lg,
+    padding: 20,
+  },
+  previewCard: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 20,
+    marginBottom: 24,
+  },
+  previewIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
-    marginBottom: appTheme.spacing.xl,
+    marginBottom: 24,
   },
-  iconSelector: {
-    marginBottom: appTheme.spacing.md,
-  },
-  iconGrid: {
+  iconGridCard: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+    padding: 16,
+    borderRadius: 16,
   },
-  iconOption: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  iconButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-  },
-  iconText: {
-    fontSize: 24,
+    borderWidth: 1,
   },
   input: {
-    marginBottom: appTheme.spacing.md,
+    marginBottom: 12,
+  },
+  settingsCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   settingRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  settingIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   settingInfo: {
     flex: 1,
-    paddingRight: appTheme.spacing.md,
+    marginLeft: 14,
+    marginRight: 12,
   },
-  dangerSection: {
-    marginTop: appTheme.spacing.xl,
+  dangerCard: {
+    borderRadius: 16,
+    padding: 16,
+  },
+  dangerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dangerInfo: {
+    flex: 1,
+    marginLeft: 12,
   },
   footer: {
-    padding: appTheme.spacing.lg,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    padding: 16,
+    paddingTop: 16,
   },
 });

@@ -1,8 +1,8 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import React from 'react';
-import { Animated, Pressable, StyleSheet, View } from 'react-native';
-import { Button, Portal, Text, useTheme } from 'react-native-paper';
+import { Animated, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Portal, Text, useTheme } from 'react-native-paper';
 
 export type DialogType = 'success' | 'error' | 'warning' | 'info' | 'confirm';
 
@@ -30,75 +30,113 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   showCancel = true,
 }) => {
   const theme = useTheme();
-  const scaleAnim = React.useRef(new Animated.Value(0)).current;
   const opacityAnim = React.useRef(new Animated.Value(0)).current;
+  const scaleAnim = React.useRef(new Animated.Value(0.85)).current;
+  const translateYAnim = React.useRef(new Animated.Value(40)).current;
   const [shouldRender, setShouldRender] = React.useState(visible);
 
   React.useEffect(() => {
     if (visible) {
       setShouldRender(true);
-      // Reset to 0 first to ensure animation works every time
-      scaleAnim.setValue(0);
       opacityAnim.setValue(0);
+      scaleAnim.setValue(0.85);
+      translateYAnim.setValue(40);
       
       Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
         Animated.spring(scaleAnim, {
           toValue: 1,
           useNativeDriver: true,
-          tension: 50,
-          friction: 7,
+          tension: 100,
+          friction: 10,
         }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 200,
+        Animated.spring(translateYAnim, {
+          toValue: 0,
           useNativeDriver: true,
+          tension: 100,
+          friction: 10,
         }),
       ]).start();
     } else {
       Animated.parallel([
-        Animated.timing(scaleAnim, {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: true,
-        }),
         Animated.timing(opacityAnim, {
           toValue: 0,
-          duration: 150,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.85,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 40,
+          duration: 200,
           useNativeDriver: true,
         }),
       ]).start(() => {
         setShouldRender(false);
       });
     }
-  }, [visible, scaleAnim, opacityAnim]);
+  }, [visible, opacityAnim, scaleAnim, translateYAnim]);
 
-  const getIconConfig = () => {
+  const getIconConfig = (): { name: keyof typeof Ionicons.glyphMap; color: string; bgColor: string } => {
     switch (type) {
       case 'success':
-        return { name: 'check-circle', color: '#4CAF50' };
+        return { name: 'checkmark-circle', color: '#4CAF50', bgColor: '#4CAF5020' };
       case 'error':
-        return { name: 'alert-circle', color: theme.colors.error };
+        return { name: 'close-circle', color: theme.colors.error, bgColor: `${theme.colors.error}20` };
       case 'warning':
-        return { name: 'alert', color: '#FF9800' };
+        return { name: 'warning', color: '#FF9800', bgColor: '#FF980020' };
       case 'confirm':
-        return { name: 'help-circle', color: theme.colors.primary };
+        return { name: 'help-circle', color: theme.colors.primary, bgColor: `${theme.colors.primary}20` };
       default:
-        return { name: 'information', color: theme.colors.primary };
+        return { name: 'information-circle', color: theme.colors.primary, bgColor: `${theme.colors.primary}20` };
     }
   };
 
   const iconConfig = getIconConfig();
+  
+  const getConfirmButtonStyle = () => {
+    switch (type) {
+      case 'error':
+        return { backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error };
+      case 'warning':
+        return { backgroundColor: '#FF980020', borderColor: '#FF9800' };
+      case 'success':
+        return { backgroundColor: '#4CAF5020', borderColor: '#4CAF50' };
+      default:
+        return { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary };
+    }
+  };
+
+  const getConfirmTextColor = () => {
+    switch (type) {
+      case 'error':
+        return theme.colors.error;
+      case 'warning':
+        return '#FF9800';
+      case 'success':
+        return '#4CAF50';
+      default:
+        return theme.colors.onSurface;
+    }
+  };
 
   if (!shouldRender) return null;
 
   return (
     <Portal>
       <View style={styles.container}>
-        {/* Backdrop - handles dismiss on tap outside */}
+        {/* Backdrop */}
         <Pressable style={styles.backdrop} onPress={onCancel}>
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: opacityAnim }]}>
             <BlurView 
-              intensity={30} 
+              intensity={25} 
               tint="dark"
               style={StyleSheet.absoluteFill}
               experimentalBlurMethod="dimezisBlurView" 
@@ -112,24 +150,34 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             styles.dialogContainer,
             {
               backgroundColor: theme.colors.surface,
-              transform: [{ scale: scaleAnim }],
+              borderColor: theme.colors.surfaceVariant,
+              transform: [
+                { scale: scaleAnim },
+                { translateY: translateYAnim }
+              ],
               opacity: opacityAnim,
-              elevation: 24, // High elevation for Android z-index
-              zIndex: 10,   // Explicit z-index
             },
           ]}
         >
           {/* Icon */}
-          <View style={[styles.iconContainer, { backgroundColor: `${iconConfig.color}15` }]}>
-            <MaterialCommunityIcons
-              name={iconConfig.name as any}
-              size={48}
+          <View 
+            style={[
+              styles.iconContainer, 
+              { 
+                backgroundColor: iconConfig.bgColor,
+                borderColor: iconConfig.color,
+              }
+            ]}
+          >
+            <Ionicons
+              name={iconConfig.name}
+              size={40}
               color={iconConfig.color}
             />
           </View>
 
           {/* Title */}
-          <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onSurface }]}>
+          <Text variant="titleLarge" style={[styles.title, { color: theme.colors.onSurface }]}>
             {title}
           </Text>
 
@@ -144,27 +192,32 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           {/* Actions */}
           <View style={styles.actions}>
             {showCancel && (
-              <Button
-                mode="text"
+              <TouchableOpacity
+                style={[styles.cancelButton, { borderColor: theme.colors.surfaceVariant }]}
                 onPress={onCancel}
-                style={styles.button}
-                labelStyle={{ color: theme.colors.onSurfaceVariant }}
+                activeOpacity={0.7}
               >
-                {cancelText}
-              </Button>
+                <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, fontWeight: '600' }}>
+                  {cancelText}
+                </Text>
+              </TouchableOpacity>
             )}
             {onConfirm && (
-              <Button
-                mode="contained"
+              <TouchableOpacity
+                style={[
+                  styles.confirmButton, 
+                  getConfirmButtonStyle()
+                ]}
                 onPress={() => {
                   onConfirm();
                   onCancel();
                 }}
-                style={[styles.button, { backgroundColor: theme.colors.primary }]}
-                labelStyle={{ color: theme.colors.onPrimary }}
+                activeOpacity={0.7}
               >
-                {confirmText}
-              </Button>
+                <Text variant="labelLarge" style={{ color: getConfirmTextColor(), fontWeight: '700' }}>
+                  {confirmText}
+                </Text>
+              </TouchableOpacity>
             )}
           </View>
         </Animated.View>
@@ -184,42 +237,59 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   dialogContainer: {
-    width: '85%',
-    maxWidth: 400,
-    borderRadius: 28,
-    padding: 24,
+    width: '88%',
+    maxWidth: 360,
+    borderRadius: 24,
+    padding: 28,
+    paddingTop: 32,
     alignItems: 'center',
+    borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowRadius: 20,
+    elevation: 24,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    borderWidth: 2,
   },
   title: {
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
+    letterSpacing: -0.3,
   },
   message: {
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 28,
     lineHeight: 22,
+    paddingHorizontal: 8,
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
+    gap: 12,
     width: '100%',
   },
-  button: {
-    minWidth: 80,
+  cancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  confirmButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
   },
 });

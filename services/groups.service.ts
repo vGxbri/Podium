@@ -47,7 +47,7 @@ export const groupsService = {
 
         // Get awards
         const { data: awards, error: awardsError } = await supabase
-          .from('awards')
+          .from('awards_with_stats')
           .select('*')
           .eq('group_id', group.id)
           .neq('status', 'archived');
@@ -104,12 +104,13 @@ export const groupsService = {
 
     if (membersError) throw membersError;
 
-    // Get awards
-    const { data: awards, error: awardsError } = await supabase
-      .from('awards')
-      .select('*')
-      .eq('group_id', groupId)
-      .order('created_at', { ascending: false });
+        // Get awards
+        const { data: awards, error: awardsError } = await supabase
+          .from('awards_with_stats')
+          .select('*')
+          .eq('group_id', groupId)
+          .neq('status', 'archived')
+          .order('created_at', { ascending: false });
 
     if (awardsError) throw awardsError;
 

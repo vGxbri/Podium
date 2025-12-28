@@ -28,17 +28,16 @@ export default function TabLayout() {
         animation: "fade", // Changed from "shift" to avoid green scrim
         tabBarHideOnKeyboard: true,
         headerStyle: {
-          backgroundColor: theme.colors.background,
-          elevation: 1,
+          backgroundColor: theme.colors.surface, // Same as tab bar
+          elevation: 0,
           shadowOpacity: 0,
           borderBottomWidth: 1,
-          borderBottomColor: theme.colors.outlineVariant,
+          borderBottomColor: theme.colors.outlineVariant, // Same as tab bar top border
         },
-        headerTintColor: theme.colors.primary,
+        headerTintColor: theme.colors.onSurface, // Light text/icons
         headerTitleStyle: {
-          fontWeight: "800",
-          fontSize: 24,
-          letterSpacing: -0.5,
+          fontWeight: "700",
+          fontSize: 20,
         },
       }}
     >

@@ -209,7 +209,7 @@ export default function ProfileScreen() {
         </Button>
 
         <Text variant="labelSmall" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
-          Podium v1.0.0
+          Juan Homo
         </Text>
       </ScrollView>
 

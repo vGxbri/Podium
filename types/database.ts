@@ -117,7 +117,6 @@ export interface Award {
   nominations_end_at: string | null;
   voting_start_at: string | null;
   voting_end_at: string | null;
-  voting_ends_at: string | null; // Added manually
   winner_id: string | null;
   is_revealed: boolean;
   created_by: string;

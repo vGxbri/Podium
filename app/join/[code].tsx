@@ -8,12 +8,11 @@ import {
 import {
   ActivityIndicator,
   Button,
-  Card,
   Surface,
   Text,
   useTheme,
 } from "react-native-paper";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { defaultGroupIcon, getIconComponent, IconName } from "../../constants/icons";
 import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
@@ -28,6 +27,7 @@ export default function JoinGroupScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const router = useRouter();
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   
   const [state, setState] = useState<JoinState>("loading");
@@ -95,7 +95,7 @@ export default function JoinGroupScreen() {
         confirmText: "Iniciar Sesión",
         cancelText: "Cancelar",
         onConfirm: () => router.push("/auth/login"),
-        showCancel: true // Ensure cancel button is shown
+        showCancel: true
       });
       return;
     }
@@ -142,9 +142,14 @@ export default function JoinGroupScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" />
-          <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
-            Cargando invitación...
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]} elevation={0}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </Surface>
+          <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
+            Cargando invitación
+          </Text>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center" }}>
+            Un momento por favor...
           </Text>
         </View>
       </SafeAreaView>
@@ -156,8 +161,8 @@ export default function JoinGroupScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.errorContainer }]} elevation={0}>
-            <Ionicons name="warning-outline" size={64} color={theme.colors.error} />
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.errorContainer, borderColor: theme.colors.error, borderWidth: 1 }]} elevation={0}>
+            <Ionicons name="warning-outline" size={48} color={theme.colors.error} />
           </Surface>
           <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
             Enlace no válido
@@ -165,10 +170,39 @@ export default function JoinGroupScreen() {
           <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", maxWidth: 280 }}>
             {error}
           </Text>
-          <Button mode="contained" onPress={handleGoHome} style={styles.button}>
+        </View>
+
+        {/* Footer */}
+        <Surface 
+          style={[
+            styles.footer, 
+            { 
+              paddingBottom: 8 + insets.bottom,
+              backgroundColor: theme.colors.surface,
+              borderTopEndRadius: 16,
+              borderTopStartRadius: 16,
+            }
+          ]} 
+          elevation={0}
+        >
+          <Button
+            mode="contained"
+            onPress={handleGoHome}
+            style={{ borderRadius: 14 }}
+            contentStyle={{ 
+              paddingVertical: 6,
+              backgroundColor: theme.colors.primary, 
+              borderRadius: 16
+            }}
+            labelStyle={{
+              color: theme.colors.onPrimary,
+              fontWeight: "600",
+              fontSize: 16
+            }}
+          >
             Ir al inicio
           </Button>
-        </View>
+        </Surface>
       </SafeAreaView>
     );
   }
@@ -178,19 +212,48 @@ export default function JoinGroupScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer }]} elevation={0}>
-            <Ionicons name="checkmark-circle" size={64} color={theme.colors.primary} />
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]} elevation={0}>
+            <Ionicons name="checkmark-circle" size={48} color={theme.colors.primary} />
           </Surface>
           <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
             ¡Ya eres miembro!
           </Text>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center" }}>
-            Ya formas parte de "{group?.name}"
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", maxWidth: 280 }}>
+            {`Ya formas parte de "${group?.name}"`}
           </Text>
-          <Button mode="contained" onPress={handleGoToGroup} style={styles.button}>
+        </View>
+
+        {/* Footer */}
+        <Surface 
+          style={[
+            styles.footer, 
+            { 
+              paddingBottom: 8 + insets.bottom,
+              backgroundColor: theme.colors.surface,
+              borderTopEndRadius: 16,
+              borderTopStartRadius: 16,
+            }
+          ]} 
+          elevation={0}
+        >
+          <Button
+            mode="contained"
+            onPress={handleGoToGroup}
+            style={{ borderRadius: 14 }}
+            contentStyle={{ 
+              paddingVertical: 6,
+              backgroundColor: theme.colors.primary, 
+              borderRadius: 16
+            }}
+            labelStyle={{
+              color: theme.colors.onPrimary,
+              fontWeight: "600",
+              fontSize: 16
+            }}
+          >
             Ir al grupo
           </Button>
-        </View>
+        </Surface>
       </SafeAreaView>
     );
   }
@@ -200,16 +263,16 @@ export default function JoinGroupScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <Surface style={[styles.iconContainer, { backgroundColor: 'rgba(50, 215, 75, 0.15)' }]} elevation={0}>
-            <Ionicons name="checkmark-circle" size={64} color="#32D74B" />
+          <Surface style={[styles.iconContainer, { backgroundColor: 'rgba(50, 215, 75, 0.15)', borderColor: '#32D74B', borderWidth: 1 }]} elevation={0}>
+            <Ionicons name="checkmark-circle" size={48} color="#32D74B" />
           </Surface>
           <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
             ¡Bienvenido!
           </Text>
-          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center" }}>
-            Te has unido a "{group?.name}"
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", maxWidth: 280 }}>
+            {`Te has unido a "${group?.name}"`}
           </Text>
-          <ActivityIndicator size="small" style={{ marginTop: 24 }} />
+          <ActivityIndicator size="small" style={{ marginTop: 24 }} color={theme.colors.primary} />
         </View>
       </SafeAreaView>
     );
@@ -220,9 +283,14 @@ export default function JoinGroupScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" />
-          <Text variant="bodyMedium" style={{ marginTop: 16, color: theme.colors.onSurfaceVariant }}>
-            Uniéndote al grupo...
+          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]} elevation={0}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+          </Surface>
+          <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginBottom: 8 }}>
+            Uniéndote al grupo
+          </Text>
+          <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center" }}>
+            Un momento por favor...
           </Text>
         </View>
       </SafeAreaView>
@@ -233,53 +301,95 @@ export default function JoinGroupScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
-        <Card mode="elevated" style={styles.card}>
-          <Card.Content style={{ alignItems: "center" }}>
+        <View style={styles.centerContent}>
+          {/* Preview Card */}
+          <Surface 
+            style={[
+              styles.previewCard,
+              { 
+                backgroundColor: theme.colors.surface, 
+                borderColor: theme.colors.secondaryContainer, 
+                borderWidth: 1 
+              }
+            ]} 
+            elevation={1}
+          >
             {/* Group Icon */}
-            <Surface style={[styles.groupIconContainer, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-              {getIconComponent((group?.icon as IconName) || defaultGroupIcon, 40, theme.colors.primary)}
+            <Surface style={[styles.groupIconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]} elevation={0}>
+              {getIconComponent((group?.icon as IconName) || defaultGroupIcon, 40, theme.colors.onSurface)}
             </Surface>
 
-            {/* Group Info */}
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
+            {/* Invitation Text */}
+            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 16 }}>
               Te han invitado a unirte a
             </Text>
-            <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginVertical: 8 }}>
+
+            {/* Group Name */}
+            <Text variant="headlineSmall" style={{ fontWeight: "700", textAlign: "center", marginTop: 4 }}>
               {group?.name}
             </Text>
             
+            {/* Group Description */}
             {group?.description && (
-              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", marginBottom: 16, maxWidth: 280 }}>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", marginTop: 8, maxWidth: 280 }}>
                 {group.description}
               </Text>
             )}
+          </Surface>
 
-            {/* Join Button */}
-            <Button
-              mode="contained"
-              onPress={handleJoin}
-              icon="account-multiple-plus"
-              style={{ width: "100%", marginTop: 8 }}
-            >
-              {isAuthenticated ? "Unirme al grupo" : "Iniciar sesión para unirme"}
-            </Button>
-
-            {/* Cancel */}
-            <Button
-              mode="outlined"
-              onPress={handleGoHome}
-              style={{ width: "100%", marginTop: 8 }}
-            >
-              Cancelar
-            </Button>
-          </Card.Content>
-        </Card>
-
-        {/* Code display */}
-        <Text variant="labelSmall" style={{ marginTop: 16, textAlign: "center", color: theme.colors.onSurfaceVariant }}>
-          Código: {code}
-        </Text>
+          {/* Code display */}
+          <View style={[styles.codeChip, { backgroundColor: theme.colors.surfaceVariant }]}>
+            <Ionicons name="key-outline" size={14} color={theme.colors.onSurfaceVariant} />
+            <Text variant="labelMedium" style={{ marginLeft: 6, color: theme.colors.onSurfaceVariant }}>
+              {code}
+            </Text>
+          </View>
+        </View>
       </View>
+
+      {/* Footer with buttons */}
+      <Surface 
+        style={[
+          styles.footer, 
+          { 
+            paddingBottom: 8 + insets.bottom,
+            backgroundColor: theme.colors.surface,
+            borderTopEndRadius: 16,
+            borderTopStartRadius: 16,
+          }
+        ]} 
+        elevation={0}
+      >
+        <Button
+          mode="contained"
+          onPress={handleJoin}
+          icon="account-multiple-plus"
+          style={{ borderRadius: 14, marginBottom: 8 }}
+          contentStyle={{ 
+            paddingVertical: 6,
+            backgroundColor: theme.colors.primary, 
+            borderRadius: 16
+          }}
+          labelStyle={{
+            color: theme.colors.onPrimary,
+            fontWeight: "600",
+            fontSize: 16
+          }}
+        >
+          {isAuthenticated ? "Unirme al grupo" : "Iniciar sesión para unirme"}
+        </Button>
+        <Button
+          mode="text"
+          onPress={handleGoHome}
+          style={{ borderRadius: 14 }}
+          labelStyle={{
+            color: theme.colors.onSurfaceVariant,
+            fontWeight: "500",
+          }}
+        >
+          Cancelar
+        </Button>
+      </Surface>
     </SafeAreaView>
   );
 }
@@ -290,8 +400,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: "center",
-    padding: appTheme.spacing.lg,
   },
   centerContent: {
     flex: 1,
@@ -300,29 +408,38 @@ const styles = StyleSheet.create({
     padding: appTheme.spacing.lg,
   },
   iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 96,
+    height: 96,
+    borderRadius: 32,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: appTheme.spacing.lg,
+    marginBottom: 24,
   },
-  button: {
-    marginTop: appTheme.spacing.xl,
-    minWidth: 200,
-  },
-  card: {
-    alignItems: "center",
+  previewCard: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 340,
   },
   groupIconContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: appTheme.spacing.lg,
   },
-  groupIcon: {
-    fontSize: 40,
+  codeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginTop: 16,
+  },
+  footer: {
+    padding: 16,
+    paddingTop: 16,
+    width: '100%',
   },
 });

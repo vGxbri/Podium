@@ -8,15 +8,15 @@ export default function HomeStackLayout() {
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: theme.colors.secondaryContainer, // Almost black
+          backgroundColor: theme.colors.surface,
         },
-        headerTintColor: theme.colors.primary,
+        headerTintColor: theme.colors.onSurface,
         headerTitleStyle: {
-          fontWeight: "800",
-          fontSize: 24,
+          fontWeight: "700",
+          fontSize: 20,
         },
         headerShadowVisible: true,
-        animation: "fade", // Consistent fade transition
+        animation: "fade",
         contentStyle: {
           backgroundColor: theme.colors.background,
         },
@@ -53,6 +53,12 @@ export default function HomeStackLayout() {
         options={{
           title: "Unirse a grupo",
           presentation: "modal",
+        }}
+      />
+      <Stack.Screen
+        name="group/members"
+        options={{
+          title: "Miembros",
         }}
       />
     </Stack>

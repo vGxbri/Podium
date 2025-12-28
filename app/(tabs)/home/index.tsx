@@ -144,10 +144,7 @@ export default function HomeScreen() {
             </View>
           ) : groups.length === 0 ? (
             <Surface style={styles.emptyCard} elevation={1}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: theme.colors.surfaceVariant }]}>
-                 <Ionicons name="trophy-outline" size={48} color={theme.colors.primary} />
-              </View>
-              <Text variant="titleMedium" style={{ marginTop: 16, fontWeight: "700" }}>
+              <Text variant="titleMedium" style={{ fontWeight: "700" }}>
                 Comienza tu legado
               </Text>
               <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8, textAlign: "center", maxWidth: 260, lineHeight: 20 }}>
@@ -156,10 +153,10 @@ export default function HomeScreen() {
               <Button 
                 mode="contained" 
                 onPress={handleCreateGroup} 
-                style={{ marginTop: 24, borderRadius: 12 }}
+                style={{ marginTop: 24, borderRadius: 12, borderColor: theme.colors.primary, borderWidth: 1, backgroundColor: theme.colors.primaryContainer }}
                 contentStyle={{ paddingVertical: 6 }}
               >
-                Crear mi primer grupo
+                + Crear un grupo
               </Button>
             </Surface>
           ) : (
@@ -282,7 +279,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 32,
     alignItems: "center",
-    backgroundColor: 'rgba(255,255,255,0.05)', // Fallback / suble effect
   },
   emptyIconContainer: {
     width: 80,

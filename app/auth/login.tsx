@@ -81,13 +81,15 @@ export default function LoginScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Image 
-              source={require("../../assets/images/Glow.png")}
-              style={styles.logo}
-              contentFit="contain"
-            />
-            <Text variant="displaySmall" style={styles.title}>
-              Bienvenido
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../../assets/images/Glow.png")}
+                style={styles.logo}
+                contentFit="contain"
+              />
+            </View>
+            <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.primary }]}>
+              ¡Hola de nuevo!
             </Text>
             <Text variant="bodyLarge" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
               Inicia sesión para continuar
@@ -106,7 +108,7 @@ export default function LoginScreen() {
               mode="outlined"
               left={<TextInput.Icon icon="email-outline" />}
               style={styles.input}
-              outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
+              outlineStyle={{ borderColor: theme.colors.secondaryContainer, borderRadius: 16 }}
             />
 
             <TextInput
@@ -124,7 +126,7 @@ export default function LoginScreen() {
                 />
               }
               style={styles.input}
-              outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
+              outlineStyle={{ borderColor: theme.colors.secondaryContainer, borderRadius: 16 }}
             />
 
             <Button
@@ -160,7 +162,7 @@ export default function LoginScreen() {
             </Text>
             <TouchableOpacity onPress={() => router.push("/auth/register")}>
               <Text variant="bodyMedium" style={[styles.link, { color: theme.colors.tertiary }]}>
-                Regístrate aquí
+                Regístrate
               </Text>
             </TouchableOpacity>
           </View>
@@ -187,14 +189,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 40,
   },
-  logo: {
-    width: 80,
-    height: 80,
+  logoContainer: {
     marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logo: {
+    width: 90,
+    height: 90,
   },
   title: {
     fontWeight: "800",
-    marginBottom: 8,
+    marginBottom: 0,
     letterSpacing: -1,
   },
   subtitle: {
@@ -205,11 +211,11 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   button: {
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   buttonContent: {
     paddingVertical: 8,

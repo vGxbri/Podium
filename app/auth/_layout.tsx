@@ -7,9 +7,10 @@ export default function AuthLayout() {
   return (
     <Stack
       screenOptions={{
-        animation: "fade", // Fade transition between auth screens
+        animation: "fade",
+        animationDuration: 200,
         headerStyle: {
-          backgroundColor: theme.colors.surface,
+          backgroundColor: theme.colors.background,
         },
         headerTintColor: theme.colors.primary,
         headerTitleStyle: {

@@ -1,14 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import * as ImagePicker from "expo-image-picker";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from 'expo-video';
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -17,20 +20,17 @@ import {
 import {
   ActivityIndicator,
   Button,
-  Card,
-  Chip,
-  Dialog,
   Portal,
   Surface,
   Text,
   TextInput,
-  useTheme,
+  useTheme
 } from "react-native-paper";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
 import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
+import { MemberSelectMenu } from "../../../../components/ui/MemberSelectMenu";
 import { useSnackbar } from "../../../../components/ui/SnackbarContext";
 import { defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
-import { theme as appTheme } from "../../../../constants/theme";
 import { useAuth, useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
 import { AwardWithNominees } from "../../../../types/database";
@@ -53,7 +53,7 @@ export default function AwardDetailScreen() {
   const theme = useTheme();
   const { showSnackbar } = useSnackbar();
   
-  const { group, isAdmin } = useGroup(groupId);
+  const { isAdmin, group } = useGroup(groupId);
   const { user } = useAuth();
   
   const [award, setAward] = useState<AwardWithNominees | null>(null);
@@ -106,7 +106,22 @@ export default function AwardDetailScreen() {
       const data = await awardsService.getAwardById(id);
       setAward(data);
       
-      if (data && data.status === 'voting') {
+      if (data) {
+        // Check for expiration
+        if (data.status === 'voting' && data.voting_end_at) {
+          const endDate = new Date(data.voting_end_at);
+          if (new Date() > endDate) {
+             console.log('Award expired, triggering check...');
+             await awardsService.checkExpiration(id);
+             // Reload
+             const updated = await awardsService.getAwardById(id);
+             setAward(updated);
+             if (updated && updated.status === 'completed') {
+                showSnackbar("La votación ha finalizado", "info");
+             }
+          }
+        }
+
         const vote = await awardsService.getMyVote(id);
         setMyVote(vote);
       }
@@ -116,13 +131,66 @@ export default function AwardDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, showSnackbar]);
 
   useFocusEffect(
     useCallback(() => {
       fetchAward();
     }, [fetchAward])
   );
+
+  const [showManageNomineesModal, setShowManageNomineesModal] = useState(false);
+  const [selectedNomineeIds, setSelectedNomineeIds] = useState<string[]>([]);
+
+  // Sync selected nominees when modal opens
+  const openManageNomineesModal = () => {
+    setSelectedNomineeIds(award?.nominees.map(n => n.user_id) || []);
+    setShowManageNomineesModal(true);
+  };
+
+  const handleUpdateNomineesList = async () => {
+    try {
+      setActionLoading(true);
+      const currentIds = award?.nominees.map(n => n.user_id) || [];
+      const toRemove = award?.nominees.filter(n => !selectedNomineeIds.includes(n.user_id)) || [];
+      const toAdd = selectedNomineeIds.filter(id => !currentIds.includes(id));
+
+      for (const n of toRemove) await awardsService.removeNominee(n.id);
+      for (const uid of toAdd) await awardsService.addNominee(award!.id, uid);
+
+      await fetchAward();
+      setShowManageNomineesModal(false);
+      showSnackbar("Lista de nominados actualizada", "success");
+    } catch (e) {
+      console.error(e);
+      showSnackbar("Error al actualizar nominados", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteNomination = async (nomineeId: string) => {
+    setDialogConfig({
+      visible: true,
+      title: "Eliminar nominación",
+      message: "¿Estás seguro de que quieres eliminar esta nominación?",
+      type: "error",
+      confirmText: "Eliminar",
+      onConfirm: async () => {
+        try {
+            setActionLoading(true);
+            await awardsService.removeNominee(nomineeId);
+            await fetchAward();
+            showSnackbar("Nominación eliminada correctamente", "success");
+        } catch (e) {
+            console.error(e);
+            showSnackbar("Error al eliminar nominación", "error");
+        } finally {
+            setActionLoading(false);
+        }
+      }
+    });
+  };
 
   const handleStartVoting = async () => {
     if (!award) return;
@@ -182,7 +250,6 @@ export default function AwardDetailScreen() {
       await awardsService.vote(award.id, nomineeId);
       setMyVote(nomineeId);
       showSnackbar("Tu voto ha sido registrado", "success");
-      fetchAward();
     } catch (error: any) {
       showSnackbar(error.message || "No se pudo registrar el voto", "error");
     } finally {
@@ -409,229 +476,437 @@ export default function AwardDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: "Detalles del Premio" }} />
+      <Stack.Screen options={{ title: award.name }} />
       <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
         {/* Header */}
-        <Surface style={[styles.header, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-          <Surface style={[styles.iconContainer, { backgroundColor: theme.colors.surface }]} elevation={2}>
-            {getIconComponent((award.icon as IconName) || defaultAwardIcon, 40, theme.colors.primary)}
+        <View style={styles.headerWrapper}>
+          <Surface 
+            style={[
+              styles.header, 
+              { 
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.secondaryContainer,
+              }
+            ]} 
+            elevation={1}
+          >
+            {/* Icon */}
+            <Surface 
+              style={[
+                styles.iconContainer, 
+                { 
+                  backgroundColor: theme.colors.primaryContainer,
+                  borderColor: theme.colors.primary,
+                }
+              ]} 
+              elevation={0}
+            >
+              {getIconComponent((award.icon as IconName) || defaultAwardIcon, 36, theme.colors.onSurface)}
+            </Surface>
+            
+            {/* Title & Description */}
+            <Text 
+              variant="headlineSmall" 
+              style={{ 
+                fontWeight: "800", 
+                textAlign: "center", 
+                marginBottom: 6,
+                letterSpacing: -0.5,
+              }}
+            >
+              {award.name}
+            </Text>
+            {award.description && (
+              <Text 
+                variant="bodyMedium" 
+                style={{ 
+                  color: theme.colors.onSurfaceVariant, 
+                  textAlign: "center", 
+                  marginBottom: 16,
+                  lineHeight: 20,
+                }}
+              >
+                {award.description}
+              </Text>
+            )}
+            
+            {/* Status Badge */}
+            <View 
+              style={[
+                styles.statusBadge, 
+                { backgroundColor: statusConfig.bg }
+              ]}
+            >
+              <Ionicons 
+                name={award.status === 'voting' ? 'hourglass-outline' : award.status === 'completed' ? 'trophy' : 'document-outline'} 
+                size={14} 
+                color={statusConfig.color} 
+              />
+              <Text style={{ color: statusConfig.color, fontWeight: "700", marginLeft: 6 }}>
+                {statusConfig.label}
+              </Text>
+            </View>
+
+            {/* Voting deadline or completion status */}
+            {award.status === 'voting' && award.voting_end_at && (
+              <View style={styles.deadlineRow}>
+                <Ionicons name="time-outline" size={14} color={theme.colors.onSurfaceVariant} />
+                <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 6 }}>
+                  Termina: {formatDate(award.voting_end_at)}
+                </Text>
+              </View>
+            )}
+
+            {award.status === 'completed' && (
+              <View style={[styles.completedBanner, { 
+                backgroundColor: !award.winner_id ? theme.colors.surfaceVariant : (award.is_revealed ? '#22C55E20' : theme.colors.primaryContainer) 
+              }]}>
+                <Ionicons 
+                  name={!award.winner_id ? 'alert-circle-outline' : (award.is_revealed ? 'checkmark-circle' : 'eye-off-outline')} 
+                  size={16} 
+                  color={!award.winner_id ? theme.colors.onSurfaceVariant : (award.is_revealed ? '#22C55E' : theme.colors.onSurfaceVariant)} 
+                />
+                <Text 
+                  style={{ 
+                    color: !award.winner_id ? theme.colors.onSurfaceVariant : (award.is_revealed ? '#22C55E' : theme.colors.onSurfaceVariant), 
+                    fontWeight: "600", 
+                    marginLeft: 8 
+                  }}
+                >
+                  {!award.winner_id ? "Premio Desierto (Insuficientes votos)" : (award.is_revealed ? "¡Ganador revelado!" : "Ganador pendiente")}
+                </Text>
+              </View>
+            )}
           </Surface>
-          <Text variant="headlineSmall" style={{ fontWeight: "bold", textAlign: "center", marginBottom: 8 }}>
-            {award.name}
-          </Text>
-          {award.description && (
-            <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, textAlign: "center", marginBottom: 12 }}>
-              {award.description}
-            </Text>
-          )}
-          
-          <Chip style={{ backgroundColor: statusConfig.bg }}>
-            <Text style={{ color: statusConfig.color, fontWeight: "600" }}>{statusConfig.label}</Text>
-          </Chip>
-
-          {award.status === 'voting' && award.voting_ends_at && (
-            <Text variant="labelMedium" style={{ color: theme.colors.error, marginTop: 8 }}>
-              Termina: {formatDate(award.voting_ends_at)}
-            </Text>
-          )}
-
-          {award.status === 'completed' && (
-            <Text variant="bodyMedium" style={{ color: theme.colors.primary, fontWeight: "600", marginTop: 8 }}>
-              {award.is_revealed ? "¡Ganador revelado!" : "Ganador pendiente de revelar."}
-            </Text>
-          )}
-        </Surface>
+        </View>
 
         {/* Nominees Section */}
         <View style={styles.section}>
-          <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
-            Nominados ({award.nominees.length})
-          </Text>
-          
+          <View style={styles.sectionHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                {award.vote_type === 'person' ? 'Nominados' : 
+                 award.vote_type === 'photo' ? 'Fotos' :
+                 award.vote_type === 'video' ? 'Vídeos' :
+                 award.vote_type === 'audio' ? 'Audios' : 'Textos'}
+              </Text>
+            {/* Count Badge */}
+            <View style={[styles.countBadge, { backgroundColor: theme.colors.secondaryContainer }]}>
+              <Text variant="labelSmall" style={{ color: theme.colors.onSecondaryContainer, fontWeight: '700' }}>
+                {award ? award.nominees.length : 0}
+              </Text>
+            </View>
+          </View>
+          </View>
+
+          {/* Manage Nominees Button (Only for Person awards in draft) */}
+          {isAdmin && award?.vote_type === 'person' && award.status === 'draft' && (
+            <Button 
+              mode="outlined" 
+              onPress={openManageNomineesModal} 
+              style={{ marginBottom: 16, borderColor: theme.colors.outline }}
+              textColor={theme.colors.onSurfaceVariant}
+              icon="account-edit-outline"
+            >
+              Gestionar Nominados
+            </Button>
+          )}
+
+          {/* Nominees List */}
           <View style={styles.nomineesList}>
-            {award.nominees.map((nominee) => (
-              <Card key={nominee.id} mode="outlined" style={styles.nomineeCard}>
-                <Card.Content style={styles.nomineeRow}>
-                  <MemberAvatar user={nominee.user} size="md" />
-                  <View style={styles.nomineeInfo}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Text variant="bodyLarge" style={{ fontWeight: "500" }}>
+            {award.nominees.map((nominee) => {
+              const isWinner = award.status === 'completed' && nominee.is_winner && award.is_revealed;
+              
+              return (
+                <Surface 
+                  key={nominee.id} 
+                  style={[
+                    styles.nomineeCard,
+                    { 
+                      backgroundColor: isWinner ? '#FFD70015' : theme.colors.surface,
+                      borderColor: isWinner ? '#FFD700' : theme.colors.secondaryContainer,
+                      paddingTop: isWinner ? 32 : 16,
+                    }
+                  ]} 
+                  elevation={1}
+                >
+                  {/* Winner Banner */}
+                  {isWinner && (
+                    <View style={[styles.winnerBanner, { backgroundColor: '#FFD700' }]}>
+                      <Ionicons name="trophy" size={12} color="#000" />
+                      <Text style={{ color: '#000', fontWeight: '700', marginLeft: 4, fontSize: 11 }}>
+                        GANADOR
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* User Row */}
+                  <View style={styles.nomineeUserRow}>
+                    <MemberAvatar user={nominee.user} size="md" />
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text variant="bodyLarge" style={{ fontWeight: "600" }}>
                         {nominee.user.display_name}
                       </Text>
-                      {award.status === 'completed' && nominee.is_winner && award.is_revealed && (
-                        <Chip compact icon={() => <Ionicons name="trophy" size={12} color="#000" />} style={{ backgroundColor: '#FFD700', height: 24 }}>
-                          Ganador
-                        </Chip>
+                      {award.vote_type !== 'person' && nominee.nomination_reason && (
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                          {nominee.nomination_reason}
+                        </Text>
                       )}
                     </View>
                     
-                      {nominee.content_url && (
-                        <>
-                          {award.vote_type === 'video' ? (
-                            <TouchableOpacity onPress={() => setSelectedImage(nominee.content_url)} activeOpacity={0.9}>
-                               <View style={styles.nomineeImage}>
-                                 <NomineeVideoThumbnail uri={nominee.content_url} />
-                               </View>
-                            </TouchableOpacity>
-                          ) : award.vote_type === 'audio' ? (
-                            <TouchableOpacity onPress={() => setSelectedImage(nominee.content_url)} activeOpacity={0.9}>
-                               <NomineeAudioPlayer uri={nominee.content_url} title={nominee.nomination_reason || 'Audio'} />
-                            </TouchableOpacity>
-                          ) : award.vote_type === 'text' ? (
-                             <NomineeTextCard text={nominee.content_url} />
-                          ) : (
-                            <TouchableOpacity onPress={() => setSelectedImage(nominee.content_url)} activeOpacity={0.9}>
-                               <Image 
-                                 source={{ uri: nominee.content_url }} 
-                                 style={styles.nomineeImage} 
-                                 contentFit="cover" 
-                               />
-                            </TouchableOpacity>
-                          )}
-                        </>
-                      )}
+                    {/* Vote Button */}
+                    {award.status === 'voting' && (
+                      <TouchableOpacity
+                        style={[
+                          styles.voteButton,
+                          { 
+                            backgroundColor: myVote === nominee.id ? theme.colors.primary : 'transparent',
+                            borderColor: myVote === nominee.id ? theme.colors.primary : theme.colors.outline,
+                          }
+                        ]}
+                        disabled={!!myVote || actionLoading}
+                        onPress={() => handleVote(nominee.id)}
+                      >
+                       <Ionicons 
+                          name={myVote === nominee.id ? "checkmark" : "heart-outline"} 
+                          size={16} 
+                          color={myVote === nominee.id ? theme.colors.onPrimary : theme.colors.outline} 
+                        />
+                        <Text 
+                          style={{ 
+                            marginLeft: 6, 
+                            fontWeight: '600',
+                            color: myVote === nominee.id ? theme.colors.onPrimary : theme.colors.outline,
+                          }}
+                        >
+                          {myVote === nominee.id ? "Votado" : "Votar"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {/* Persistent Vote Indicator (when not voting) */}
+                    {award.status !== 'voting' && myVote === nominee.id && (
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        backgroundColor: isWinner ? '#FFD70025' : theme.colors.primaryContainer, 
+                        paddingHorizontal: 12, 
+                        paddingVertical: 6, 
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: isWinner ? '#FFD700' : theme.colors.primary
+                      }}>
+                        <Ionicons name="checkmark-circle" size={16} color={isWinner ? '#B8860B' : theme.colors.onSurface} />
+                        <Text variant="labelSmall" style={{ color: isWinner ? '#B8860B' : theme.colors.onSurface, marginLeft: 6, fontWeight: '700' }}>
+                          Tu voto
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Vote Count (when revealed) */}
+                    {award.is_revealed && (
+                      <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        backgroundColor: theme.colors.surfaceVariant, 
+                        paddingHorizontal: 10, 
+                        paddingVertical: 6, 
+                        borderRadius: 20,
+                        marginLeft: 8,
+                      }}>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, fontWeight: '700' }}>
+                          {nominee.vote_count} {nominee.vote_count === 1 ? 'voto' : 'votos'}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Delete Button (Draft Mode) */}
+                    {isAdmin && award.status === 'draft' && award.vote_type !== 'person' && (
+                      <TouchableOpacity 
+                        onPress={() => handleDeleteNomination(nominee.id)}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="trash-outline" size={20} color={theme.colors.error} />
+                      </TouchableOpacity>
+                    )}
                   </View>
                   
-                  {award.status === 'voting' && (
-                    <Button
-                      mode={myVote === nominee.id ? "contained" : "outlined"}
-                      compact
-                      disabled={!!myVote || actionLoading}
-                      onPress={() => handleVote(nominee.id)}
-                    >
-                      {myVote === nominee.id ? "Votado" : "Votar"}
-                    </Button>
+                  {/* Content Display */}
+                  {nominee.content_url && (
+                    <View style={styles.nomineeContentWrapper}>
+                      
+                      {award.vote_type === 'video' ? (
+                        <TouchableOpacity 
+                          onPress={() => setSelectedImage(nominee.content_url)} 
+                          activeOpacity={0.9}
+                          style={styles.mediaContainer}
+                        >
+                          <NomineeVideoThumbnail uri={nominee.content_url} />
+                        </TouchableOpacity>
+                      ) : award.vote_type === 'audio' ? (
+                        <TouchableOpacity 
+                          onPress={() => setSelectedImage(nominee.content_url)} 
+                          activeOpacity={0.9}
+                        >
+                          <NomineeAudioPlayer uri={nominee.content_url} title={nominee.nomination_reason || 'Audio'} />
+                        </TouchableOpacity>
+                      ) : award.vote_type === 'text' ? (
+                        <NomineeTextCard text={nominee.content_url} />
+                      ) : (
+                        <TouchableOpacity 
+                          onPress={() => setSelectedImage(nominee.content_url)} 
+                          activeOpacity={0.9}
+                          style={styles.mediaContainer}
+                        >
+                          <Image 
+                            source={{ uri: nominee.content_url }} 
+                            style={styles.nomineeImage} 
+                            contentFit="cover" 
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
-                </Card.Content>
-              </Card>
-            ))}
+                </Surface>
+              );
+            })}
           </View>
         </View>
 
         {/* Admin Actions */}
         {isAdmin && (
-          <Card mode="outlined" style={styles.adminSection}>
-            <Card.Content>
-              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12, textTransform: "uppercase" }}>
-                Administración
-              </Text>
-              
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="settings-outline" size={18} color={theme.colors.onSurfaceVariant} />
+                <Text variant="titleMedium" style={{ fontWeight: "600", marginLeft: 8 }}>
+                  Administración
+                </Text>
+              </View>
+            </View>
+            
+            <Surface 
+              style={[
+                styles.adminCard, 
+                { 
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.secondaryContainer,
+                }
+              ]} 
+              elevation={1}
+            >
               {award.status === 'draft' && (
-                <Button mode="contained" onPress={() => setShowStartVotingModal(true)} loading={actionLoading}>
-                  Iniciar Votación
-                </Button>
-              )}
+                <>
+                  <TouchableOpacity 
+                    style={[styles.adminButton, { backgroundColor: theme.colors.primaryContainer }]}
+                    onPress={() => setShowStartVotingModal(true)}
+                  >
+                    <Ionicons name="play-circle" size={24} color={theme.colors.onPrimaryContainer} />
+                    <View style={{ marginLeft: 14, flex: 1 }}>
+                      <Text style={{ fontWeight: '700', color: theme.colors.onSurface }}>
+                        Iniciar Votación
+                      </Text>
+                      <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        Abrir el premio para votos
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.onSurfaceVariant} />
+                  </TouchableOpacity>
 
-              {award.status === 'draft' && ['photo', 'video', 'audio', 'text'].includes(award.vote_type) && (
-                <Button 
-                  mode="outlined" 
-                  icon={award.vote_type === 'video' ? "video" : award.vote_type === 'audio' ? "microphone" : award.vote_type === 'text' ? "text" : "camera"} 
-                  onPress={handleAddNomineeWithPhoto}
-                  style={{ marginTop: 10 }}
-                  loading={actionLoading}
-                >
-                  {award.vote_type === 'video' ? "Añadir Vídeo" : award.vote_type === 'audio' ? "Añadir Audio" : award.vote_type === 'text' ? "Añadir Texto" : "Añadir Foto"}
-                </Button>
+                  {['photo', 'video', 'audio', 'text'].includes(award.vote_type) && (
+                    <TouchableOpacity 
+                      style={[styles.adminButton, { borderTopWidth: 1, borderTopColor: theme.colors.surfaceVariant }]}
+                      onPress={handleAddNomineeWithPhoto}
+                    >
+                      <Ionicons 
+                        name={award.vote_type === 'video' ? 'videocam-outline' : award.vote_type === 'audio' ? 'musical-notes-outline' : award.vote_type === 'text' ? 'document-text-outline' : 'camera-outline'} 
+                        size={24} 
+                        color={theme.colors.tertiary} 
+                      />
+                      <View style={{ marginLeft: 14, flex: 1 }}>
+                        <Text style={{ fontWeight: '600', color: theme.colors.onSurface }}>
+                          {award.vote_type === 'video' ? 'Añadir Vídeo' : award.vote_type === 'audio' ? 'Añadir Audio' : award.vote_type === 'text' ? 'Añadir Texto' : 'Añadir Foto'}
+                        </Text>
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                          Subir nuevo contenido
+                        </Text>
+                      </View>
+                      <Ionicons name="add-circle-outline" size={20} color={theme.colors.onSurfaceVariant} />
+                    </TouchableOpacity>
+                  )}
+                </>
               )}
               
               {award.status === 'voting' && (
-                <Button mode="outlined" onPress={handleFinishVoting} loading={actionLoading} style={{ marginBottom: 10 }}>
-                  Finalizar Votación Ahora
-                </Button>
+                <TouchableOpacity 
+                  style={[styles.adminButton, { backgroundColor: '#F59E0B15' }]}
+                  onPress={handleFinishVoting}
+                >
+                  <Ionicons name="stop-circle" size={24} color="#F59E0B" />
+                  <View style={{ marginLeft: 14, flex: 1 }}>
+                    <Text style={{ fontWeight: '700', color: theme.colors.onSurface }}>
+                      Finalizar Votación
+                    </Text>
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                      Cerrar votos y declarar ganador
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.onSurfaceVariant} />
+                </TouchableOpacity>
               )}
 
-              {award.status === 'completed' && !award.is_revealed && (
-                <Button mode="contained" onPress={handleRevealWinner} loading={actionLoading} style={{ marginBottom: 10 }}>
-                  Revelar Ganador
-                </Button>
+              {award.status === 'completed' && !award.is_revealed && award.winner_id && (
+                <TouchableOpacity 
+                  style={[styles.adminButton, { backgroundColor: '#22C55E15' }]}
+                  onPress={handleRevealWinner}
+                >
+                  <Ionicons name="eye" size={24} color="#22C55E" />
+                  <View style={{ marginLeft: 14, flex: 1 }}>
+                    <Text style={{ fontWeight: '700', color: theme.colors.onSurface }}>
+                      Revelar Ganador
+                    </Text>
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                      Mostrar resultado a todos
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={theme.colors.onSurfaceVariant} />
+                </TouchableOpacity>
               )}
               
-              <Button 
-                mode="text" 
-                onPress={handleDelete} 
-                textColor={theme.colors.error}
-                style={{ marginTop: 10 }}
+              <TouchableOpacity 
+                style={[styles.adminButton, { borderTopWidth: 1, borderTopColor: theme.colors.surfaceVariant }]}
+                onPress={handleDelete}
               >
-                Eliminar Premio
-              </Button>
-            </Card.Content>
-          </Card>
+                <Ionicons name="trash-outline" size={24} color={theme.colors.error} />
+                <View style={{ marginLeft: 14, flex: 1 }}>
+                  <Text style={{ fontWeight: '600', color: theme.colors.error }}>
+                    Eliminar Premio
+                  </Text>
+                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    Esta acción es irreversible
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </Surface>
+          </View>
         )}
         
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Start Voting Modal */}
-      <Modal
+      {/* Start Voting Modal - ConfirmDialog Style */}
+      <StartVotingModal
         visible={showStartVotingModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowStartVotingModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Card style={styles.modalContent}>
-            <Card.Content>
-              <Text variant="titleLarge" style={{ textAlign: "center", marginBottom: 8 }}>
-                Configurar Votación
-              </Text>
-              <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
-                Elige cuándo termina la votación:
-              </Text>
-              
-              <View style={styles.optionsContainer}>
-                {(['24h', '48h', '1w', 'custom'] as const).map((mode) => (
-                  <TouchableOpacity
-                    key={mode}
-                    style={[
-                      styles.optionButton,
-                      { 
-                        borderColor: deadlineMode === mode ? theme.colors.primary : theme.colors.outline,
-                        backgroundColor: deadlineMode === mode ? theme.colors.primaryContainer : 'transparent'
-                      }
-                    ]}
-                    onPress={() => setDeadlineMode(mode)}
-                  >
-                    <Text style={{ color: deadlineMode === mode ? theme.colors.primary : theme.colors.onSurface, fontWeight: "500" }}>
-                      {mode === '24h' && '24 Horas'}
-                      {mode === '48h' && '48 Horas'}
-                      {mode === '1w' && '1 Semana'}
-                      {mode === 'custom' && 'Personalizado'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              
-              {deadlineMode === 'custom' && (
-                <View style={styles.customDateContainer}>
-                  <TextInput
-                    label="DD/MM/YYYY"
-                    mode="outlined"
-                    value={customDate}
-                    onChangeText={setCustomDate}
-                    style={{ flex: 1, marginRight: 8 }}
-                  />
-                  <TextInput
-                    label="HH:MM"
-                    mode="outlined"
-                    value={customTime}
-                    onChangeText={setCustomTime}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              )}
-
-              <View style={styles.modalActions}>
-                <Button mode="text" onPress={() => setShowStartVotingModal(false)} style={{ flex: 1, marginRight: 8 }}>
-                  Cancelar
-                </Button>
-                <Button mode="contained" onPress={handleStartVoting} style={{ flex: 1, marginLeft: 8 }}>
-                  Comenzar
-                </Button>
-              </View>
-            </Card.Content>
-          </Card>
-        </View>
-      </Modal>
+        onClose={() => setShowStartVotingModal(false)}
+        onConfirm={handleStartVoting}
+        award={award}
+        deadlineMode={deadlineMode}
+        setDeadlineMode={setDeadlineMode}
+        customDate={customDate}
+        setCustomDate={setCustomDate}
+        customTime={customTime}
+        setCustomTime={setCustomTime}
+      />
 
       <Modal
         visible={!!selectedImage}
@@ -661,43 +936,40 @@ export default function AwardDetailScreen() {
         </View>
       </Modal>
 
-      {/* Text Nomination Modal */}
-      <Portal>
-        <Dialog visible={showTextModal} onDismiss={() => setShowTextModal(false)}>
-          <Dialog.Title>Tu Nominación</Dialog.Title>
-          <Dialog.Content>
-            <TextInput
-              label="Escribe tu texto"
-              value={textNomination}
-              onChangeText={setTextNomination}
-              multiline
-              numberOfLines={4}
-              mode="outlined"
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowTextModal(false)}>Cancelar</Button>
-            <Button onPress={handleSubmitTextNomination} loading={actionLoading}>Enviar</Button>
-          </Dialog.Actions>
-        </Dialog>
+      {/* Text Nomination Modal - ConfirmDialog Style */}
+      <TextNominationModal
+        visible={showTextModal}
+        onClose={() => setShowTextModal(false)}
+        onConfirm={handleSubmitTextNomination}
+        textNomination={textNomination}
+        setTextNomination={setTextNomination}
+        actionLoading={actionLoading}
+      />
 
-        {/* Audio Title Modal */}
-        <Dialog visible={showAudioTitleModal} onDismiss={() => setShowAudioTitleModal(false)}>
-            <Dialog.Title>Título del Audio</Dialog.Title>
-            <Dialog.Content>
-                <TextInput 
-                    label="Título del audio"
-                    value={audioTitle}
-                    onChangeText={setAudioTitle}
-                    mode="outlined"
-                />
-            </Dialog.Content>
-            <Dialog.Actions>
-                <Button onPress={() => setShowAudioTitleModal(false)}>Cancelar</Button>
-                <Button onPress={handleSubmitAudioNomination} loading={actionLoading}>Subir</Button>
-            </Dialog.Actions>
-        </Dialog>
-      </Portal>
+      <MemberSelectMenu
+        visible={showManageNomineesModal}
+        title="Gestionar Nominados"
+        subtitle="Selecciona quién estará nominado"
+        members={group?.members || []}
+        selectedIds={selectedNomineeIds}
+        onSelectionChange={setSelectedNomineeIds}
+        onConfirm={handleUpdateNomineesList}
+        onDismiss={() => setShowManageNomineesModal(false)}
+        confirmText="Guardar"
+        loading={actionLoading}
+        minSelection={2}
+      />
+
+
+      <AudioTitleModal
+        visible={showAudioTitleModal}
+        onClose={() => setShowAudioTitleModal(false)}
+        onConfirm={handleSubmitAudioNomination}
+        audioTitle={audioTitle}
+        setAudioTitle={setAudioTitle}
+        audioFileName={tempAudio?.name || 'Audio'}
+        actionLoading={actionLoading}
+      />
 
       <ConfirmDialog
         visible={dialogConfig.visible}
@@ -714,6 +986,781 @@ export default function AwardDetailScreen() {
   );
 }
 
+// ==========================================
+// START VOTING MODAL - ConfirmDialog Style
+// ==========================================
+interface StartVotingModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  award: AwardWithNominees | null;
+  deadlineMode: '24h' | '48h' | '1w' | 'custom';
+  setDeadlineMode: (mode: '24h' | '48h' | '1w' | 'custom') => void;
+  customDate: string;
+  setCustomDate: (date: string) => void;
+  customTime: string;
+  setCustomTime: (time: string) => void;
+}
+
+function StartVotingModal({
+  visible,
+  onClose,
+  onConfirm,
+  award,
+  deadlineMode,
+  setDeadlineMode,
+  customDate,
+  setCustomDate,
+  customTime,
+  setCustomTime,
+}: StartVotingModalProps) {
+  const theme = useTheme();
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const translateYAnim = useRef(new Animated.Value(40)).current;
+  const [shouldRender, setShouldRender] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      opacityAnim.setValue(0);
+      scaleAnim.setValue(0.85);
+      translateYAnim.setValue(40);
+      
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.85,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 40,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShouldRender(false);
+      });
+    }
+  }, [visible, opacityAnim, scaleAnim, translateYAnim]);
+
+  if (!shouldRender) return null;
+
+  const canStart = award && award.nominees.length >= 2;
+
+  return (
+    <Portal>
+      <View style={modalStyles.container}>
+        {/* Backdrop with Blur */}
+        <Pressable style={modalStyles.backdrop} onPress={onClose}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: opacityAnim }]}>
+            <BlurView 
+              intensity={25} 
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+              experimentalBlurMethod="dimezisBlurView" 
+            />
+          </Animated.View>
+        </Pressable>
+        
+        {/* Dialog */}
+        <Animated.View
+          style={[
+            modalStyles.dialogContainer,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.surfaceVariant,
+              transform: [
+                { scale: scaleAnim },
+                { translateY: translateYAnim }
+              ],
+              opacity: opacityAnim,
+            },
+          ]}
+        >
+          {/* Icon */}
+          <View 
+            style={[
+              modalStyles.iconContainer, 
+              { 
+                backgroundColor: `${theme.colors.primary}20`,
+                borderColor: theme.colors.primary,
+              }
+            ]}
+          >
+            <Ionicons name="play-circle" size={40} color={theme.colors.primary} />
+          </View>
+
+          {/* Title */}
+          <Text variant="titleLarge" style={[modalStyles.title, { color: theme.colors.onSurface }]}>
+            Iniciar Votación
+          </Text>
+
+          {/* Message */}
+          <Text variant="bodyMedium" style={[modalStyles.message, { color: theme.colors.onSurfaceVariant }]}>
+            {canStart 
+              ? "Configura la duración de la votación"
+              : "Necesitas más nominados para iniciar"}
+          </Text>
+
+          {/* Validation Warning */}
+          {award && award.nominees.length < 2 && (
+            <View style={[modalStyles.warningBox, { backgroundColor: '#FF980020', borderColor: '#FF9800' }]}>
+              <Ionicons name="alert-circle" size={20} color="#FF9800" />
+              <Text 
+                style={{ 
+                  color: '#FF9800', 
+                  marginLeft: 10, 
+                  fontWeight: '600', 
+                  fontSize: 13,
+                  includeFontPadding: false,
+                  textAlignVertical: 'center',
+                }}
+              >
+                Se necesitan mínimo 2 {award.vote_type === 'person' ? 'nominados' : 
+                  award.vote_type === 'photo' ? 'fotos' :
+                  award.vote_type === 'video' ? 'vídeos' :
+                  award.vote_type === 'audio' ? 'audios' : 'textos'}
+              </Text>
+            </View>
+          )}
+
+          {/* Duration Options */}
+          {canStart && (
+            <>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12, alignSelf: 'flex-start' }}>
+                Duración
+              </Text>
+              <View style={modalStyles.durationGrid}>
+                {([
+                  { key: '24h', label: '24h', icon: 'time-outline' },
+                  { key: '48h', label: '48h', icon: 'time-outline' },
+                  { key: '1w', label: '1 Sem', icon: 'calendar-outline' },
+                  { key: 'custom', label: 'Custom', icon: 'create-outline' },
+                ] as const).map((option) => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      modalStyles.durationOption,
+                      { 
+                        borderColor: deadlineMode === option.key ? theme.colors.primary : theme.colors.outline,
+                        backgroundColor: deadlineMode === option.key ? theme.colors.primaryContainer : 'transparent',
+                      }
+                    ]}
+                    onPress={() => setDeadlineMode(option.key)}
+                  >
+                    <Ionicons 
+                      name={option.icon as any} 
+                      size={18} 
+                      color={deadlineMode === option.key ? theme.colors.onSurface : theme.colors.onSurfaceVariant} 
+                    />
+                    <Text style={{ 
+                      color: deadlineMode === option.key ? theme.colors.onSurface : theme.colors.onSurfaceVariant, 
+                      fontWeight: "600",
+                      marginTop: 4,
+                      fontSize: 12,
+                    }}>
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              
+              {deadlineMode === 'custom' && (
+                <View style={modalStyles.customDateRow}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
+                      Fecha
+                    </Text>
+                    <TextInput
+                      placeholder="DD/MM/YYYY"
+                      mode="outlined"
+                      value={customDate}
+                      onChangeText={setCustomDate}
+                      style={{ backgroundColor: theme.colors.surface }}
+                      outlineStyle={{ borderRadius: 10 }}
+                      dense
+                      left={<TextInput.Icon icon="calendar" size={18} color={theme.colors.primary} />}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
+                      Hora
+                    </Text>
+                    <TextInput
+                      placeholder="HH:MM"
+                      mode="outlined"
+                      value={customTime}
+                      onChangeText={setCustomTime}
+                      style={{ backgroundColor: theme.colors.surface }}
+                      outlineStyle={{ borderRadius: 10 }}
+                      dense
+                      left={<TextInput.Icon icon="clock-outline" size={18} color={theme.colors.primary} />}
+                    />
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+
+          {/* Actions */}
+          <View style={modalStyles.actions}>
+            <TouchableOpacity
+              style={[modalStyles.cancelButton, { borderColor: theme.colors.surfaceVariant }]}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, fontWeight: '600' }}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+            {canStart && (
+              <TouchableOpacity
+                style={[modalStyles.confirmButton, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary }]}
+                onPress={() => {
+                  onConfirm();
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="play" size={16} color={theme.colors.onSurface} style={{ marginRight: 6 }} />
+                <Text variant="labelLarge" style={{ color: theme.colors.onSurface, fontWeight: '700' }}>
+                  Comenzar
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </Portal>
+  );
+}
+
+// ==========================================
+// TEXT NOMINATION MODAL - ConfirmDialog Style
+// ==========================================
+interface TextNominationModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  textNomination: string;
+  setTextNomination: (text: string) => void;
+  actionLoading: boolean;
+}
+
+function TextNominationModal({
+  visible,
+  onClose,
+  onConfirm,
+  textNomination,
+  setTextNomination,
+  actionLoading,
+}: TextNominationModalProps) {
+  const theme = useTheme();
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const translateYAnim = useRef(new Animated.Value(40)).current;
+  const [shouldRender, setShouldRender] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      opacityAnim.setValue(0);
+      scaleAnim.setValue(0.85);
+      translateYAnim.setValue(40);
+      
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.85,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 40,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShouldRender(false);
+      });
+    }
+  }, [visible, opacityAnim, scaleAnim, translateYAnim]);
+
+  if (!shouldRender) return null;
+
+  const canSubmit = textNomination.trim().length > 0;
+
+  return (
+    <Portal>
+      <View style={modalStyles.container}>
+        {/* Backdrop with Blur */}
+        <Pressable style={modalStyles.backdrop} onPress={onClose}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: opacityAnim }]}>
+            <BlurView 
+              intensity={25} 
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+              experimentalBlurMethod="dimezisBlurView" 
+            />
+          </Animated.View>
+        </Pressable>
+        
+        {/* Dialog */}
+        <Animated.View
+          style={[
+            modalStyles.dialogContainer,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.surfaceVariant,
+              transform: [
+                { scale: scaleAnim },
+                { translateY: translateYAnim }
+              ],
+              opacity: opacityAnim,
+            },
+          ]}
+        >
+          {/* Icon */}
+          <View 
+            style={[
+              modalStyles.iconContainer, 
+              { 
+                backgroundColor: `${theme.colors.primary}20`,
+                borderColor: theme.colors.primary,
+              }
+            ]}
+          >
+            <Ionicons name="document-text" size={40} color={theme.colors.primary} />
+          </View>
+
+          {/* Title */}
+          <Text variant="titleLarge" style={[modalStyles.title, { color: theme.colors.onSurface }]}>
+            Tu Nominación
+          </Text>
+
+          {/* Message */}
+          <Text variant="bodyMedium" style={[modalStyles.message, { color: theme.colors.onSurfaceVariant }]}>
+            Escribe el texto que quieres nominar
+          </Text>
+
+          {/* Text Input */}
+          <View style={{ width: '100%', marginBottom: 20 }}>
+            <TextInput
+              placeholder="Escribe tu texto aquí..."
+              value={textNomination}
+              onChangeText={setTextNomination}
+              multiline
+              numberOfLines={4}
+              mode="outlined"
+              style={{ backgroundColor: theme.colors.surface, minHeight: 100 }}
+              outlineStyle={{ borderRadius: 14 }}
+              contentStyle={{ paddingTop: 12 }}
+            />
+            <Text 
+              variant="labelSmall" 
+              style={{ color: theme.colors.onSurfaceVariant, textAlign: 'right', marginTop: 6 }}
+            >
+              {textNomination.length} caracteres
+            </Text>
+          </View>
+
+          {/* Actions */}
+          <View style={modalStyles.actions}>
+            <TouchableOpacity
+              style={[modalStyles.cancelButton, { borderColor: theme.colors.surfaceVariant }]}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, fontWeight: '600' }}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                modalStyles.confirmButton, 
+                { 
+                  backgroundColor: canSubmit ? theme.colors.primaryContainer : theme.colors.surfaceVariant, 
+                  borderColor: canSubmit ? theme.colors.primary : theme.colors.outline,
+                  opacity: canSubmit ? 1 : 0.6,
+                }
+              ]}
+              onPress={onConfirm}
+              disabled={!canSubmit || actionLoading}
+              activeOpacity={0.7}
+            >
+              {actionLoading ? (
+                <ActivityIndicator size="small" color={theme.colors.onSurface} />
+              ) : (
+                <>
+                  <Ionicons name="send" size={16} color={canSubmit ? theme.colors.onSurface : theme.colors.onSurfaceVariant} style={{ marginRight: 6 }} />
+                  <Text variant="labelLarge" style={{ color: canSubmit ? theme.colors.onSurface : theme.colors.onSurfaceVariant, fontWeight: '700' }}>
+                    Enviar
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Portal>
+  );
+}
+
+
+
+
+
+// ==========================================
+// AUDIO TITLE MODAL - ConfirmDialog Style
+// ==========================================
+interface AudioTitleModalProps {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  audioTitle: string;
+  setAudioTitle: (text: string) => void;
+  audioFileName: string;
+  actionLoading: boolean;
+}
+
+function AudioTitleModal({
+  visible,
+  onClose,
+  onConfirm,
+  audioTitle,
+  setAudioTitle,
+  audioFileName,
+  actionLoading,
+}: AudioTitleModalProps) {
+  const theme = useTheme();
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const translateYAnim = useRef(new Animated.Value(40)).current;
+  const [shouldRender, setShouldRender] = useState(visible);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      opacityAnim.setValue(0);
+      scaleAnim.setValue(0.85);
+      translateYAnim.setValue(40);
+      
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+        Animated.spring(translateYAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 100,
+          friction: 10,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 0.85,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateYAnim, {
+          toValue: 40,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setShouldRender(false);
+      });
+    }
+  }, [visible, opacityAnim, scaleAnim, translateYAnim]);
+
+  if (!shouldRender) return null;
+
+  const canSubmit = audioTitle.trim().length > 0;
+
+  return (
+    <Portal>
+      <View style={modalStyles.container}>
+        {/* Backdrop with Blur */}
+        <Pressable style={modalStyles.backdrop} onPress={onClose}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: opacityAnim }]}>
+            <BlurView 
+              intensity={25} 
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+              experimentalBlurMethod="dimezisBlurView" 
+            />
+          </Animated.View>
+        </Pressable>
+        
+        {/* Dialog */}
+        <Animated.View
+          style={[
+            modalStyles.dialogContainer,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.surfaceVariant,
+              transform: [
+                { scale: scaleAnim },
+                { translateY: translateYAnim }
+              ],
+              opacity: opacityAnim,
+            },
+          ]}
+        >
+          {/* Icon */}
+          <View 
+            style={[
+              modalStyles.iconContainer, 
+              { 
+                backgroundColor: `${theme.colors.primary}20`,
+                borderColor: theme.colors.primary,
+              }
+            ]}
+          >
+            <Ionicons name="musical-notes" size={40} color={theme.colors.primary} />
+          </View>
+
+          {/* Title */}
+          <Text variant="titleLarge" style={[modalStyles.title, { color: theme.colors.onSurface }]}>
+            Título del Audio
+          </Text>
+
+          {/* File name info */}
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center', 
+            backgroundColor: theme.colors.surfaceVariant,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 10,
+            marginBottom: 16,
+          }}>
+            <Ionicons name="document-outline" size={16} color={theme.colors.onSurfaceVariant} />
+            <Text 
+              variant="labelMedium" 
+              style={{ color: theme.colors.onSurfaceVariant, marginLeft: 8 }}
+              numberOfLines={1}
+            >
+              {audioFileName}
+            </Text>
+          </View>
+
+          {/* Text Input */}
+          <View style={{ width: '100%', marginBottom: 20 }}>
+            <TextInput
+              placeholder="Dale un nombre a tu audio..."
+              value={audioTitle}
+              onChangeText={setAudioTitle}
+              mode="outlined"
+              style={{ backgroundColor: theme.colors.surface }}
+              outlineStyle={{ borderRadius: 14 }}
+              left={<TextInput.Icon icon="pencil" size={18} color={theme.colors.primary} />}
+            />
+          </View>
+
+          {/* Actions */}
+          <View style={modalStyles.actions}>
+            <TouchableOpacity
+              style={[modalStyles.cancelButton, { borderColor: theme.colors.surfaceVariant }]}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, fontWeight: '600' }}>
+                Cancelar
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                modalStyles.confirmButton, 
+                { 
+                  backgroundColor: canSubmit ? theme.colors.primaryContainer : theme.colors.surfaceVariant, 
+                  borderColor: canSubmit ? theme.colors.primary : theme.colors.outline,
+                  opacity: canSubmit ? 1 : 0.6,
+                }
+              ]}
+              onPress={onConfirm}
+              disabled={!canSubmit || actionLoading}
+              activeOpacity={0.7}
+            >
+              {actionLoading ? (
+                <ActivityIndicator size="small" color={theme.colors.onSurface} />
+              ) : (
+                <>
+                  <Ionicons name="cloud-upload" size={16} color={canSubmit ? theme.colors.onSurface : theme.colors.onSurfaceVariant} style={{ marginRight: 6 }} />
+                  <Text variant="labelLarge" style={{ color: canSubmit ? theme.colors.onSurface : theme.colors.onSurfaceVariant, fontWeight: '700' }}>
+                    Subir
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Portal>
+  );
+}
+
+// Modal Styles (shared between both modals)
+const modalStyles = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  dialogContainer: {
+    width: '88%',
+    maxWidth: 360,
+    borderRadius: 24,
+    padding: 28,
+    paddingTop: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  iconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    borderWidth: 2,
+  },
+  title: {
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 10,
+    letterSpacing: -0.3,
+  },
+  message: {
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+    paddingHorizontal: 8,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+    width: '100%',
+  },
+  durationGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    width: '100%',
+  },
+  durationOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  customDateRow: {
+    flexDirection: 'row',
+    width: '100%',
+    marginBottom: 16,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  cancelButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  confirmButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+  },
+});
+
 // Video Helper Components
 function NomineeVideoThumbnail({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, player => {
@@ -722,7 +1769,7 @@ function NomineeVideoThumbnail({ uri }: { uri: string }) {
   });
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ width: '100%', height: 200, backgroundColor: '#000' }}>
       <VideoView 
         player={player} 
         style={StyleSheet.absoluteFill} 
@@ -754,19 +1801,80 @@ function FullScreenVideoPlayer({ uri }: { uri: string }) {
 }
 
 function NomineeAudioPlayer({ uri, title }: { uri: string, title?: string }) {
-  // Simple thumbnail: icon + title
+  const theme = useTheme();
   return (
-    <View style={[styles.nomineeImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-       <Ionicons name="musical-notes" size={48} color="#666" />
-       {title && (
-         <Text variant="labelMedium" style={{ marginTop: 8, color: '#333', fontWeight: 'bold' }} numberOfLines={1}>
-            {title}
-         </Text>
-       )}
-       <View style={{ position: 'absolute', bottom: 5, right: 5 }}>
-          <Ionicons name="play-circle" size={24} color="#000" />
-       </View>
-    </View>
+    <Surface
+      style={{
+        width: '100%',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.secondaryContainer,
+        backgroundColor: theme.colors.surfaceVariant,
+        overflow: 'hidden',
+      }}
+      elevation={0}
+    >
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+      }}>
+        {/* Play Button with premium style */}
+        <View style={{
+          width: 56,
+          height: 56,
+          borderRadius: 16,
+          backgroundColor: theme.colors.primaryContainer,
+          borderWidth: 1.5,
+          borderColor: theme.colors.primary,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <Ionicons name="play" size={24} color={theme.colors.onSurface} style={{ marginLeft: 2 }} />
+        </View>
+        
+        {/* Title & Waveform */}
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <Text style={{ 
+            color: theme.colors.onSurface, 
+            fontWeight: '700', 
+            fontSize: 15, 
+            marginBottom: 8,
+            letterSpacing: -0.3,
+          }} numberOfLines={1}>
+            {title || 'Audio'}
+          </Text>
+          
+          {/* Waveform bars with theme color */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 24 }}>
+            {[14, 20, 10, 24, 16, 12, 18, 14, 22, 10, 18, 14, 20, 12].map((h, i) => (
+              <View 
+                key={i} 
+                style={{ 
+                  width: 3, 
+                  height: h, 
+                  backgroundColor: theme.colors.primary,
+                  opacity: 0.6,
+                  borderRadius: 2,
+                }} 
+              />
+            ))}
+          </View>
+        </View>
+
+        {/* Music note indicator */}
+        <View style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          backgroundColor: theme.colors.secondaryContainer,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
+          <Ionicons name="musical-notes" size={18} color={theme.colors.onSurfaceVariant} />
+        </View>
+      </View>
+    </Surface>
   );
 }
 
@@ -780,18 +1888,26 @@ function FullScreenAudioPlayer({ uri }: { uri: string }) {
   };
 
   return (
-    <View style={[styles.fullScreenImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }]}>
-       <Ionicons name="musical-notes" size={100} color="#fff" style={{ marginBottom: 40 }}/>
+    <View style={[styles.fullScreenImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e' }]}>
+       <Ionicons name="musical-notes" size={100} color="#fff" style={{ marginBottom: 40, opacity: 0.5 }}/>
        
-       <TouchableOpacity onPress={togglePlay}>
+       <TouchableOpacity onPress={togglePlay} style={{
+         width: 100,
+         height: 100,
+         borderRadius: 50,
+         backgroundColor: 'rgba(255,255,255,0.15)',
+         justifyContent: 'center',
+         alignItems: 'center',
+       }}>
           <Ionicons 
-             name={status.playing ? "pause-circle" : "play-circle"} 
-             size={80} 
+             name={status.playing ? "pause" : "play"} 
+             size={44} 
              color="#fff" 
+             style={{ marginLeft: status.playing ? 0 : 4 }}
           />
        </TouchableOpacity>
        
-       <Text style={{ color: 'white', marginTop: 20 }}>
+       <Text style={{ color: 'rgba(255,255,255,0.7)', marginTop: 24, fontSize: 16, fontWeight: '500' }}>
           {status.currentTime ? Math.floor(status.currentTime / 1000) : 0}s / {status.duration ? Math.floor(status.duration / 1000) : 0}s
        </Text>
     </View>
@@ -799,15 +1915,56 @@ function FullScreenAudioPlayer({ uri }: { uri: string }) {
 }
 
 function NomineeTextCard({ text }: { text: string }) {
-  // Enhanced card for text: scrollable if long, better styling
+  const theme = useTheme();
   return (
-    <View style={[styles.nomineeImage, { backgroundColor: '#fff', padding: 8, justifyContent: 'flex-start' }]}>
-       <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={true}>
-          <Text style={{ fontSize: 13, lineHeight: 18, color: '#333', fontStyle: 'italic' }}>
+    <Surface
+      style={{
+        width: '100%',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: theme.colors.secondaryContainer,
+        backgroundColor: theme.colors.surfaceVariant,
+        overflow: 'hidden',
+      }}
+      elevation={0}
+    >
+      {/* Quote icon decorator */}
+      <View style={{ 
+        position: 'absolute', 
+        top: 12, 
+        left: 12,
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: theme.colors.primaryContainer,
+        borderWidth: 1,
+        borderColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1,
+      }}>
+        <Ionicons name="chatbubble-ellipses" size={16} color={theme.colors.onSurface} />
+      </View>
+      
+      {/* Text content */}
+      <View style={{ paddingTop: 56, paddingHorizontal: 16, paddingBottom: 16 }}>
+        <ScrollView 
+          nestedScrollEnabled 
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: 100 }}
+        >
+          <Text style={{ 
+            fontSize: 15, 
+            lineHeight: 24, 
+            color: theme.colors.onSurface,
+            fontStyle: 'italic',
+            fontWeight: '500',
+          }}>
             &quot;{text}&quot;
           </Text>
-       </ScrollView>
-    </View>
+        </ScrollView>
+      </View>
+    </Surface>
   );
 }
 
@@ -820,82 +1977,117 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
   header: {
     alignItems: "center",
-    padding: appTheme.spacing.xl,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: appTheme.spacing.md,
+    marginBottom: 16,
   },
-  icon: {
-    fontSize: 40,
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  deadlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  completedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 12,
   },
   section: {
-    padding: appTheme.spacing.lg,
+    padding: 16,
   },
-  nomineesList: {
-    gap: appTheme.spacing.sm,
-  },
-  nomineeCard: {
-    marginBottom: 4,
-  },
-  nomineeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  nomineeInfo: {
-    flex: 1,
-    marginLeft: appTheme.spacing.md,
-  },
-  adminSection: {
-    margin: appTheme.spacing.lg,
-    marginTop: 0,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: appTheme.spacing.lg,
-  },
-  modalContent: {
-    borderRadius: 20,
-  },
-  optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  optionButton: {
-    flex: 1,
-    minWidth: '45%',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  customDateContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  modalActions: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  countBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  nomineesList: {
+    gap: 12,
+  },
+  nomineeCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  winnerBanner: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderBottomLeftRadius: 10,
+  },
+  nomineeUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  voteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  nomineeContentWrapper: {
+    marginTop: 12,
+  },
+  mediaContainer: {
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   nomineeImage: {
     width: '100%',
     height: 200,
-    borderRadius: 8,
-    marginTop: 8,
+    borderRadius: 12,
     backgroundColor: '#f0f0f0',
+  },
+  adminSection: {
+    margin: 16,
+    marginTop: 0,
+  },
+  adminCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  adminButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   fullScreenImageContainer: {
     flex: 1,

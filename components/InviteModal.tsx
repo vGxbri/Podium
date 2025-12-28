@@ -6,14 +6,11 @@ import {
   Pressable,
   Share,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Colors } from "../constants/Colors";
-import { theme } from "../constants/theme";
-import { Button } from "./ui/Button";
-import { Card } from "./ui/Card";
+import { Button, Surface, Text, useTheme } from "react-native-paper";
+import { useSnackbar } from "./ui/SnackbarContext";
 
 interface InviteModalProps {
   visible: boolean;
@@ -28,18 +25,26 @@ export const InviteModal: React.FC<InviteModalProps> = ({
   inviteCode,
   groupName,
 }) => {
+  const theme = useTheme();
+  const { showSnackbar } = useSnackbar();
+  
   // App link for sharing and copying
   const appLink = `podium://join/${inviteCode}`;
 
+  const handleCopyCode = async () => {
+    await Clipboard.setStringAsync(inviteCode);
+    showSnackbar("Código copiado al portapapeles", "success");
+  };
+
   const handleCopyLink = async () => {
     await Clipboard.setStringAsync(appLink);
-    // Could show a toast here
+    showSnackbar("Enlace copiado al portapapeles", "success");
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `¡Únete a mi grupo "${groupName}" en Podium! 🏆\n\nAbre este enlace en tu móvil:\n${appLink}\n\nO usa el código: ${inviteCode}`,
+        message: `¡Únete a mi grupo "${groupName}" en Podium! 🏆\n\nUsa el código: ${inviteCode}\n\nO abre este enlace:\n${appLink}`,
         title: `Únete a ${groupName} en Podium`,
       });
     } catch (error) {
@@ -53,51 +58,96 @@ export const InviteModal: React.FC<InviteModalProps> = ({
       transparent
       animationType="fade"
       onRequestClose={onClose}
+      statusBarTranslucent
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
-          <Card variant="elevated" padding="lg">
-            {/* Header */}
+        <Pressable style={[styles.modalContent, { backgroundColor: theme.colors.surface }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.header}>
-              <Text style={styles.title}>Invitar Amigos</Text>
-              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* QR Code Placeholder */}
-            <View style={styles.qrContainer}>
-              <View style={styles.qrPlaceholder}>
-                <Ionicons name="qr-code" size={80} color={Colors.primary} />
-                <Text style={styles.qrCode}>{inviteCode}</Text>
-              </View>
-            </View>
-
-            {/* Link Section */}
-            <View style={styles.linkSection}>
-              <Text style={styles.linkLabel}>Enlace de invitación</Text>
-              <View style={styles.linkRow}>
-                <Text style={styles.linkText} numberOfLines={1}>
-                  {appLink}
-                </Text>
-                <TouchableOpacity onPress={handleCopyLink} style={styles.copyButton}>
-                  <Ionicons name="copy-outline" size={20} color={Colors.primary} />
+                <View style={{ width: 40 }} />
+                <Text variant="titleLarge" style={{ fontWeight: "700" }}>Invitar Amigos</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                    <Ionicons name="close" size={24} color={theme.colors.onSurfaceVariant} />
                 </TouchableOpacity>
-              </View>
             </View>
 
-            {/* Share Button */}
-            <Button
-              title="Compartir"
-              onPress={handleShare}
-              icon={<Ionicons name="share-outline" size={20} color={Colors.textOnPrimary} />}
-            />
+            <View style={styles.content}>
+                {/* Invite Code Section */}
+                <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant, marginBottom: 16 }}>
+                    Comparte este código con tus amigos
+                </Text>
 
-            {/* Helper Text */}
-            <Text style={styles.helperText}>
-              Comparte este enlace con tus amigos para que se unan al grupo
-            </Text>
-          </Card>
+                <TouchableOpacity 
+                    onPress={handleCopyCode}
+                    activeOpacity={0.7}
+                >
+                    <Surface 
+                        style={[
+                            styles.codeContainer, 
+                            { 
+                                backgroundColor: theme.colors.primaryContainer,
+                                borderColor: theme.colors.primary,
+                                borderWidth: 2, // Dashed border simulated or just solid
+                                borderStyle: 'dashed'
+                            }
+                        ]} 
+                        elevation={0}
+                    >
+                        <Text variant="displayMedium" style={{ fontWeight: "800", color: theme.colors.onSurface, letterSpacing: 4 }}>
+                            {inviteCode}
+                        </Text>
+                        <View style={styles.tapToCopy}>
+                            <Ionicons name="copy-outline" size={14} color={theme.colors.onPrimaryContainer} />
+                            <Text variant="labelSmall" style={{ color: theme.colors.onPrimaryContainer, marginLeft: 4 }}>
+                                Toca para copiar
+                            </Text>
+                        </View>
+                    </Surface>
+                </TouchableOpacity>
+
+                {/* Divider */}
+                <View style={styles.dividerContainer}>
+                    <View style={[styles.divider, { backgroundColor: theme.colors.surfaceVariant }]} />
+                    <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, paddingHorizontal: 12 }}>
+                        O COMPARTE EL ENLACE
+                    </Text>
+                    <View style={[styles.divider, { backgroundColor: theme.colors.surfaceVariant }]} />
+                </View>
+
+                {/* Link Section */}
+                <Surface 
+                    style={[
+                        styles.linkContainer, 
+                        { 
+                            backgroundColor: theme.colors.surfaceVariant, 
+                            borderColor: theme.colors.outlineVariant, 
+                            borderWidth: 1 
+                        }
+                    ]}
+                    elevation={0}
+                >
+                    <Ionicons name="link" size={20} color={theme.colors.onSurfaceVariant} style={{ marginLeft: 4 }} />
+                    <Text numberOfLines={1} style={[styles.linkText, { color: theme.colors.onSurface }]}>
+                        {appLink}
+                    </Text>
+                    <TouchableOpacity 
+                        style={[styles.copyLinkButton, { backgroundColor: theme.colors.surface }]} 
+                        onPress={handleCopyLink}
+                    >
+                        <Ionicons name="copy-outline" size={18} color={theme.colors.primary} />
+                    </TouchableOpacity>
+                </Surface>
+
+                {/* Share Button */}
+                <Button
+                    mode="contained"
+                    onPress={handleShare}
+                    icon="share-variant"
+                    style={{ borderRadius: 12, marginTop: 8 }}
+                    contentStyle={{ paddingVertical: 6 }}
+                >
+                    Compartir enlace
+                </Button>
+            </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -107,80 +157,74 @@ export const InviteModal: React.FC<InviteModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: theme.spacing.lg,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "flex-end", // Bottom sheet style
   },
   modalContent: {
     width: "100%",
-    maxWidth: 400,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 24,
+    paddingBottom: 40,
+    elevation: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: theme.spacing.lg,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: Colors.text,
+    marginBottom: 24,
   },
   closeButton: {
-    padding: 4,
+    padding: 8,
+    marginRight: -8,
   },
-  qrContainer: {
-    alignItems: "center",
-    marginBottom: theme.spacing.lg,
+  content: {
+    gap: 16,
   },
-  qrPlaceholder: {
-    width: 160,
-    height: 160,
-    borderRadius: theme.borderRadius.lg,
-    backgroundColor: Colors.backgroundLight,
+  codeContainer: {
+    padding: 24,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    borderStyle: "dashed",
-  },
-  qrCode: {
-    marginTop: theme.spacing.sm,
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.primary,
-    letterSpacing: 2,
-  },
-  linkSection: {
-    marginBottom: theme.spacing.lg,
-  },
-  linkLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.textSecondary,
     marginBottom: 8,
   },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.backgroundLight,
-    borderRadius: theme.borderRadius.md,
-    padding: theme.spacing.md,
+  tapToCopy: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    opacity: 0.6,
+    marginTop: 8,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 8,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+  },
+  linkContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 14,
+    marginBottom: 8,
   },
   linkText: {
     flex: 1,
+    marginHorizontal: 12,
     fontSize: 14,
-    color: Colors.text,
-    marginRight: 8,
   },
-  copyButton: {
-    padding: 4,
-  },
-  helperText: {
-    marginTop: theme.spacing.md,
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: "center",
+  copyLinkButton: {
+    padding: 8,
+    borderRadius: 10,
+    elevation: 1,
   },
 });

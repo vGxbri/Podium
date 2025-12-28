@@ -2,30 +2,29 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from "react-native";
 import {
-    ActivityIndicator,
-    Button,
-    Card,
-    Checkbox,
-    Surface,
-    Text,
-    TextInput,
-    useTheme,
+  ActivityIndicator,
+  Button,
+  Surface,
+  Text,
+  TextInput,
+  useTheme,
 } from "react-native-paper";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
 import { awardIconOptions, defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
-import { theme as appTheme } from "../../../../constants/theme";
 import { useGroup } from "../../../../hooks";
 import { awardsService } from "../../../../services";
 import { VoteType } from "../../../../types/database";
+
+import { useSnackbar } from "../../../../components/ui/SnackbarContext";
 
 const VOTE_TYPE_OPTIONS: { value: VoteType; label: string; icon: string }[] = [
   { value: 'person', label: 'Personas', icon: 'people' },
@@ -35,8 +34,6 @@ const VOTE_TYPE_OPTIONS: { value: VoteType; label: string; icon: string }[] = [
   { value: 'text', label: 'Texto', icon: 'document-text' },
 ];
 
-import { useSnackbar } from "../../../../components/ui/SnackbarContext";
-
 export default function CreateAwardScreen() {
   const { groupId } = useLocalSearchParams<{ groupId: string }>();
   const router = useRouter();
@@ -44,7 +41,7 @@ export default function CreateAwardScreen() {
   const theme = useTheme();
   const { showSnackbar } = useSnackbar();
   
-  const { group, isLoading: groupLoading } = useGroup(groupId);
+  const { group, isLoading: groupLoading, isAdmin } = useGroup(groupId);
   
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -52,6 +49,11 @@ export default function CreateAwardScreen() {
   const [selectedNominees, setSelectedNominees] = useState<string[]>([]);
   const [selectedVoteType, setSelectedVoteType] = useState<VoteType>('person');
   const [loading, setLoading] = useState(false);
+
+  const withOpacity = (color: string, opacity: number) => {
+    const alpha = Math.round(opacity * 255).toString(16).padStart(2, '0');
+    return color + alpha;
+  };
 
   // Loading state
   if (groupLoading) {
@@ -81,6 +83,23 @@ export default function CreateAwardScreen() {
     );
   }
 
+  // Verificar permisos: solo admins o miembros si allow_member_nominations está activado
+  const canCreateAward = isAdmin || group.settings?.allow_member_nominations;
+  
+  if (!canCreateAward) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.notFound}>
+          <Ionicons name="lock-closed-outline" size={48} color={theme.colors.onSurfaceVariant} />
+          <Text variant="bodyLarge" style={{ marginVertical: 16, color: theme.colors.onSurfaceVariant, textAlign: 'center' }}>
+            Solo los administradores pueden crear premios en este grupo
+          </Text>
+          <Button mode="contained" onPress={() => router.back()}>Volver</Button>
+        </View>
+      </View>
+    );
+  }
+
   const toggleNominee = (userId: string) => {
     setSelectedNominees((prev) =>
       prev.includes(userId)
@@ -90,7 +109,6 @@ export default function CreateAwardScreen() {
   };
 
   const handleCreate = async () => {
-    // For person type, require nominees; for others, proceed without nominees
     const needsNominees = selectedVoteType === 'person';
     if (!name.trim() || (needsNominees && selectedNominees.length < 2) || !groupId) return;
 
@@ -106,6 +124,7 @@ export default function CreateAwardScreen() {
         nominee_ids: needsNominees ? selectedNominees : [],
       });
       
+      showSnackbar("¡Premio creado!", "success");
       router.back();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Error al crear el premio";
@@ -125,168 +144,288 @@ export default function CreateAwardScreen() {
           style={styles.scrollView}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
+          {/* Preview Card */}
+          <Surface 
+            style={[
+              styles.previewCard, 
+              { 
+                backgroundColor: theme.colors.surface, 
+                borderColor: theme.colors.secondaryContainer, 
+                borderWidth: 1 
+              }
+            ]} 
+            elevation={1}
+          >
+            <View style={[styles.previewIconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]}>
+              {getIconComponent(selectedIcon, 32, theme.colors.onSurface)}
+            </View>
+            <Text variant="titleLarge" style={{ fontWeight: "700", marginTop: 12, textAlign: 'center' }}>
+              {name.trim() || "Nombre del premio"}
+            </Text>
+            {description.trim() ? (
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: 'center' }}>
+                {description}
+              </Text>
+            ) : null}
+          </Surface>
+
           {/* Icon Selector */}
           <View style={styles.section}>
-            <Text variant="labelLarge" style={{ marginBottom: 8 }}>
-              Icono del premio
+            <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+              Elige un icono
             </Text>
-            <View style={styles.iconGrid}>
+            <Surface 
+              style={[
+                styles.iconGridCard, 
+                { 
+                  backgroundColor: theme.colors.surface, 
+                  borderColor: theme.colors.secondaryContainer, 
+                  borderWidth: 1 
+                }
+              ]} 
+              elevation={1}
+            >
               {awardIconOptions.map((iconName) => (
                 <TouchableOpacity
                   key={iconName}
                   style={[
                     styles.iconButton,
                     { 
-                      backgroundColor: selectedIcon === iconName ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                      borderColor: selectedIcon === iconName ? theme.colors.primary : 'transparent'
+                      backgroundColor: selectedIcon === iconName 
+                        ? theme.colors.primaryContainer 
+                        : 'transparent',
+                      borderColor: selectedIcon === iconName 
+                        ? theme.colors.primary 
+                        : theme.colors.outlineVariant,
                     },
                   ]}
                   onPress={() => setSelectedIcon(iconName)}
                 >
                   {getIconComponent(
                     iconName, 
-                    28, 
-                    selectedIcon === iconName ? theme.colors.primary : theme.colors.onSurfaceVariant
+                    24, 
+                    selectedIcon === iconName 
+                      ? theme.colors.onSurface 
+                      : withOpacity(theme.colors.onSurfaceVariant, 0.4)
                   )}
                 </TouchableOpacity>
               ))}
-            </View>
+            </Surface>
           </View>
 
-          {/* Award Name */}
-          <TextInput
-            label="Nombre del premio"
-            placeholder="ej. Mejor Amigo del Año"
-            value={name}
-            onChangeText={setName}
-            mode="outlined"
-            style={styles.input}
-          />
+          {/* Form Fields */}
+          <View style={styles.section}>
+            <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+              Detalles
+            </Text>
+            
+            <TextInput
+              label="Nombre del premio"
+              placeholder="ej. Mejor Amigo del Año"
+              value={name}
+              onChangeText={setName}
+              mode="outlined"
+              maxLength={40}
+              style={styles.input}
+              outlineStyle={{ borderRadius: 14 }}
+              left={<TextInput.Icon icon="trophy" />}
+            />
 
-          {/* Description */}
-          <TextInput
-            label="Descripción (opcional)"
-            placeholder="Describe este premio..."
-            value={description}
-            onChangeText={setDescription}
-            mode="outlined"
-            multiline
-            numberOfLines={2}
-            style={styles.input}
-          />
+            <TextInput
+              label="Descripción (opcional)"
+              placeholder="Describe este premio..."
+              value={description}
+              onChangeText={setDescription}
+              mode="outlined"
+              multiline
+              numberOfLines={2}
+              style={styles.input}
+              outlineStyle={{ borderRadius: 14 }}
+              left={<TextInput.Icon icon="text" />}
+            />
+          </View>
 
           {/* Vote Type Selector */}
           <View style={styles.section}>
-            <Text variant="labelLarge" style={{ marginBottom: 8 }}>
+            <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
               ¿Qué se va a votar?
             </Text>
-            <View style={styles.voteTypeGrid}>
-              {VOTE_TYPE_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.voteTypeButton,
-                    {
-                      backgroundColor: selectedVoteType === option.value ? theme.colors.primaryContainer : theme.colors.surfaceVariant,
-                      borderColor: selectedVoteType === option.value ? theme.colors.primary : 'transparent'
-                    },
-                  ]}
-                  onPress={() => setSelectedVoteType(option.value)}
-                >
-                  <Ionicons
-                    name={option.icon as any}
-                    size={24}
-                    color={selectedVoteType === option.value ? theme.colors.primary : theme.colors.onSurfaceVariant}
-                  />
-                  <Text
-                    variant="labelSmall"
-                    style={{
-                      marginTop: 4,
-                      color: selectedVoteType === option.value ? theme.colors.primary : theme.colors.onSurfaceVariant
-                    }}
+            <Surface 
+              style={[
+                styles.voteTypeCard, 
+                { 
+                  backgroundColor: theme.colors.surface, 
+                  borderColor: theme.colors.secondaryContainer, 
+                  borderWidth: 1 
+                }
+              ]} 
+              elevation={1}
+            >
+              {VOTE_TYPE_OPTIONS.map((option, index) => {
+                const isSelected = selectedVoteType === option.value;
+                const isLast = index === VOTE_TYPE_OPTIONS.length - 1;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.voteTypeRow,
+                      isSelected && { backgroundColor: theme.colors.primaryContainer },
+                      !isLast && { borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant }
+                    ]}
+                    onPress={() => setSelectedVoteType(option.value)}
                   >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <View style={[
+                      styles.voteTypeIconContainer,
+                      { 
+                        backgroundColor: isSelected ? theme.colors.primary : theme.colors.surfaceVariant,
+                      }
+                    ]}>
+                      <Ionicons
+                        name={option.icon as any}
+                        size={18}
+                        color={isSelected ? theme.colors.onPrimary : theme.colors.onSurfaceVariant}
+                      />
+                    </View>
+                    <Text
+                      variant="bodyLarge"
+                      style={{
+                        flex: 1,
+                        marginLeft: 14,
+                        fontWeight: isSelected ? '600' : '400',
+                        color: theme.colors.onSurface
+                      }}
+                    >
+                      {option.label}
+                    </Text>
+                    <Ionicons 
+                      name={isSelected ? "radio-button-on" : "radio-button-off"} 
+                      size={22} 
+                      color={theme.colors.onPrimaryContainer} 
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+            </Surface>
           </View>
 
           {/* Nominees Section - Only show for 'person' vote type */}
           {selectedVoteType === 'person' && (
             <View style={styles.section}>
               <View style={styles.nomineesHeader}>
-                <Text variant="labelLarge">Seleccionar nominados</Text>
-                <Text variant="labelMedium" style={{ color: theme.colors.primary }}>
-                  {selectedNominees.length} seleccionados
+                <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+                  Seleccionar nominados
                 </Text>
               </View>
-              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 12 }}>
+              <View style={styles.nomineesList}>
+                <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
                 Mínimo 2 nominados requeridos
-              </Text>
+                </Text>
+                <Text variant="labelMedium" style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                  {selectedNominees.length} {selectedNominees.length === 1 ? 'seleccionado' : 'seleccionados'}
+                </Text>
+              </View>
+              
 
-              <Card mode="outlined">
-                <Card.Content>
-                  {group.members.length === 0 ? (
-                    <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
-                      No hay miembros en el grupo
-                    </Text>
-                  ) : (
-                    group.members.map((member) => {
-                      const isSelected = selectedNominees.includes(member.user_id);
-                      return (
-                        <TouchableOpacity
-                          key={member.user_id}
-                          style={[
-                            styles.nomineeRow,
-                            isSelected && { backgroundColor: theme.colors.secondaryContainer },
-                          ]}
-                          onPress={() => toggleNominee(member.user_id)}
-                          activeOpacity={0.7}
-                        >
-                          <MemberAvatar user={member} size="sm" />
-                          <Text variant="bodyMedium" style={{ flex: 1, marginLeft: 12 }}>
-                            {member.display_name}
-                          </Text>
-                          <Checkbox
-                            status={isSelected ? 'checked' : 'unchecked'}
-                            onPress={() => toggleNominee(member.user_id)}
-                          />
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-                </Card.Content>
-              </Card>
+              <Surface 
+                style={[
+                  styles.nomineesCard, 
+                  { 
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.secondaryContainer, 
+                    borderWidth: 1 
+                  }
+                ]} 
+                elevation={1}
+              >
+                {group.members.length === 0 ? (
+                  <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant, padding: 20 }}>
+                    No hay miembros en el grupo
+                  </Text>
+                ) : (
+                  group.members.map((member, index) => {
+                    const isSelected = selectedNominees.includes(member.user_id);
+                    const isLast = index === group.members.length - 1;
+                    return (
+                      <TouchableOpacity
+                        key={member.user_id}
+                        style={[
+                          styles.nomineeRow,
+                          isSelected && { backgroundColor: theme.colors.primaryContainer },
+                          !isSelected && { backgroundColor: theme.colors.surface },
+                          !isLast && { borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant }
+                        ]}
+                        onPress={() => toggleNominee(member.user_id)}
+                        activeOpacity={0.7}
+                      >
+                        <MemberAvatar user={member} size="sm" />
+                        <Text variant="bodyMedium" style={{ flex: 1, marginLeft: 12, fontWeight: isSelected ? '600' : '400' }}>
+                          {member.display_name}
+                        </Text>
+                        <Ionicons 
+                          name={isSelected ? "checkmark-circle" : "ellipse-outline"} 
+                          size={24} 
+                          color={theme.colors.onPrimaryContainer} 
+                        />
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
+              </Surface>
             </View>
           )}
 
           {/* Info for non-person vote types */}
           {selectedVoteType !== 'person' && (
-            <Card mode="outlined" style={styles.section}>
-              <Card.Content>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="information-circle-outline" size={24} color={theme.colors.primary} />
-                  <Text variant="bodyMedium" style={{ marginLeft: 12, flex: 1, color: theme.colors.onSurfaceVariant }}>
-                    Los participantes podrán subir {selectedVoteType === 'photo' ? 'fotos' : selectedVoteType === 'video' ? 'videos' : selectedVoteType === 'audio' ? 'audios' : 'textos'} cuando la votación esté activa.
-                  </Text>
-                </View>
-              </Card.Content>
-            </Card>
+            <Surface 
+              style={[
+                styles.infoCard, 
+                { 
+                  backgroundColor: theme.colors.primaryContainer, 
+                  borderColor: theme.colors.primary, 
+                  borderWidth: 1 
+                }
+              ]} 
+              elevation={0}
+            >
+              <Ionicons name="information-circle" size={20} color={theme.colors.onSurface} />
+              <Text variant="bodyMedium" style={{ marginLeft: 12, flex: 1, color: theme.colors.onSurface }}>
+                Podrás subir {selectedVoteType === 'photo' ? 'fotos' : selectedVoteType === 'video' ? 'videos' : selectedVoteType === 'audio' ? 'audios' : 'textos'} antes de comenzar la votación.
+              </Text>
+            </Surface>
           )}
         </ScrollView>
 
         {/* Submit Button */}
-        <Surface style={[styles.footer, { paddingBottom: appTheme.spacing.lg + insets.bottom, backgroundColor: theme.colors.surface }]} elevation={1}>
-            <Button
-              mode="contained"
-              onPress={handleCreate}
-              loading={loading}
-              disabled={!name.trim() || (selectedVoteType === 'person' && selectedNominees.length < 2)}
-            >
-              Crear Premio
-            </Button>
+        <Surface 
+          style={[
+            styles.footer, 
+            { 
+              paddingBottom: 8 + insets.bottom,
+              backgroundColor: theme.colors.surface,
+              borderTopEndRadius: 16,
+              borderTopStartRadius: 16,
+            }
+          ]} 
+          elevation={0}
+        >
+          <Button
+            mode="contained"
+            onPress={handleCreate}
+            loading={loading}
+            disabled={!name.trim() || (selectedVoteType === 'person' && selectedNominees.length < 2) || loading}
+            style={{ borderRadius: 14 }}
+            contentStyle={{ 
+              backgroundColor: theme.colors.primaryContainer, 
+              paddingVertical: 6,
+              borderColor: theme.colors.primary, 
+              borderWidth: 1, 
+              borderRadius: 16
+            }}
+          >
+            Crear Premio
+          </Button>
         </Surface>
       </KeyboardAvoidingView>
     </View>
@@ -304,7 +443,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: appTheme.spacing.lg,
+    padding: 20,
   },
   centerContent: {
     flex: 1,
@@ -315,55 +454,88 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: appTheme.spacing.lg,
+    padding: 20,
+  },
+  previewCard: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 20,
+    marginBottom: 24,
+  },
+  previewIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
-    marginBottom: appTheme.spacing.lg,
+    marginBottom: 24,
   },
-  iconGrid: {
+  iconGridCard: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: appTheme.spacing.sm,
+    gap: 10,
+    padding: 16,
+    borderRadius: 16,
   },
   iconButton: {
-    width: 52,
-    height: 52,
-    borderRadius: appTheme.borderRadius.md,
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
+    borderWidth: 1,
   },
   input: {
-    marginBottom: appTheme.spacing.md,
+    marginBottom: 12,
+  },
+  voteTypeCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  voteTypeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  voteTypeIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   nomineesHeader: {
+    marginBottom: 4,
+  },
+  nomineesList: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 12,
+    
+  },
+  nomineesCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   nomineeRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: appTheme.spacing.sm,
-    borderRadius: appTheme.borderRadius.md,
-    marginBottom: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 24,
   },
   footer: {
-    padding: appTheme.spacing.lg,
-    paddingTop: appTheme.spacing.md,
-  },
-  voteTypeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: appTheme.spacing.sm,
-  },
-  voteTypeButton: {
-    width: 70,
-    height: 70,
-    borderRadius: appTheme.borderRadius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
+    padding: 16,
+    paddingTop: 16,
   },
 });

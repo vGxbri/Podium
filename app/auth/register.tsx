@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { Button, HelperText, Text, TextInput, useTheme } from "react-native-paper";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { useSnackbar } from "../../components/ui/SnackbarContext";
 import { theme as appTheme } from "../../constants/theme";
 import { useAuth } from "../../hooks";
@@ -30,7 +29,6 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const handleRegister = async () => {
     if (!displayName.trim() || !email.trim() || !password || !confirmPassword) {
@@ -51,7 +49,8 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
       await signUp(email.trim(), password, displayName.trim());
-      setShowSuccessDialog(true);
+      showSnackbar("¡Cuenta creada exitosamente!", "success");
+      router.replace("/");
     } catch (err: any) {
       // Handle specific Supabase error codes
       let message = "Error al registrarse";
@@ -105,16 +104,17 @@ export default function RegisterScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Image 
-              source={require("../../assets/images/Glow.png")}
-              style={styles.logo}
-              contentFit="contain"
-            />
-            <Text variant="displaySmall" style={styles.title}>
-              Crear Cuenta
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require("../../assets/images/Glow.png")}
+                style={styles.logo}
+                contentFit="contain"
+              />
+            </View>
+            <Text variant="headlineLarge" style={[styles.title, { color: theme.colors.primary }]}>Crear Cuenta
             </Text>
             <Text variant="bodyLarge" style={[styles.subtitle, { color: theme.colors.onSurfaceVariant }]}>
-              Únete a Podium y empieza a premiar
+              Únete a nuestra familia
             </Text>
           </View>
 
@@ -128,7 +128,7 @@ export default function RegisterScreen() {
               mode="outlined"
               left={<TextInput.Icon icon="account-outline" />}
               style={styles.input}
-              outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
+              outlineStyle={{ borderColor: theme.colors.secondaryContainer, borderRadius: 16 }}
             />
 
             <TextInput
@@ -141,7 +141,7 @@ export default function RegisterScreen() {
               mode="outlined"
               left={<TextInput.Icon icon="email-outline" />}
               style={styles.input}
-              outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
+              outlineStyle={{ borderColor: theme.colors.secondaryContainer, borderRadius: 16 }}
             />
 
             <View>
@@ -161,7 +161,7 @@ export default function RegisterScreen() {
                 }
                 error={!!passwordTooShort}
                 style={styles.input}
-                outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
+                outlineStyle={{ borderColor: theme.colors.secondaryContainer, borderRadius: 16 }}
               />
               {passwordTooShort && (
                 <HelperText type="error" visible style={{ marginTop: -12, marginBottom: 8 }}>
@@ -187,7 +187,7 @@ export default function RegisterScreen() {
                 }
                 error={!!passwordsDoNotMatch}
                 style={styles.input}
-                outlineStyle={{ borderColor: theme.colors.secondaryContainer }}
+                outlineStyle={{ borderColor: theme.colors.secondaryContainer, borderRadius: 16 }}
               />
               {passwordsDoNotMatch && (
                 <HelperText type="error" visible style={{ marginTop: -12, marginBottom: 8 }}>
@@ -229,25 +229,12 @@ export default function RegisterScreen() {
             </Text>
             <TouchableOpacity onPress={() => router.push("/auth/login")}>
               <Text variant="bodyMedium" style={[styles.link, { color: theme.colors.tertiary }]}>
-                Inicia sesión aquí
+                Inicia sesión
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <ConfirmDialog
-        visible={showSuccessDialog}
-        title="¡Cuenta Creada!"
-        message="Tu cuenta ha sido creada exitosamente. Por favor verifica tu correo para activarla."
-        type="success"
-        confirmText="Entendido"
-        onConfirm={() => {
-          setShowSuccessDialog(false);
-          router.replace("/auth/login");
-        }}
-        onCancel={() => {}}
-      />
     </SafeAreaView>
   );
 }
@@ -269,14 +256,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 32,
   },
+  logoContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   logo: {
-    width: 70,
-    height: 70,
-    marginBottom: 16,
+    width: 90,
+    height: 90,
   },
   title: {
     fontWeight: "800",
-    marginBottom: 8,
+    marginBottom: 0,
     letterSpacing: -1,
   },
   subtitle: {
@@ -287,11 +278,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
   button: {
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   buttonContent: {
     paddingVertical: 8,

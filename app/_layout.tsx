@@ -1,7 +1,7 @@
 import { DarkTheme as NavigationDarkTheme, DefaultTheme as NavigationDefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useColorScheme } from "react-native";
+import { useColorScheme, View } from "react-native";
 import { MD3DarkTheme, MD3LightTheme, PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { SnackbarProvider } from "../components/ui/SnackbarContext";
@@ -22,9 +22,9 @@ export default function RootLayout() {
         ...NavigationDarkTheme,
         colors: {
           ...NavigationDarkTheme.colors,
-          primary: customColorsDark.primary, // Tab indicator, links
+          primary: customColorsDark.primary,
           background: customColorsDark.background,
-          card: customColorsDark.surface,
+          card: customColorsDark.background, // Same as background for consistent transitions
           text: customColorsDark.onSurface,
           border: customColorsDark.outline,
           notification: customColorsDark.primary,
@@ -34,9 +34,9 @@ export default function RootLayout() {
         ...NavigationDefaultTheme,
         colors: {
           ...NavigationDefaultTheme.colors,
-          primary: customColors.primary, // Tab indicator, links
+          primary: customColors.primary,
           background: customColors.background,
-          card: customColors.surface,
+          card: customColors.background, // Same as background for consistent transitions
           text: customColors.onSurface,
           border: customColors.outline,
           notification: customColors.primary,
@@ -50,7 +50,9 @@ export default function RootLayout() {
           <PaperProvider theme={paperTheme}>
             <SnackbarProvider>
               <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-              <Slot />
+              <View style={{ flex: 1, backgroundColor: paperTheme.colors.background }}>
+                <Slot />
+              </View>
             </SnackbarProvider>
           </PaperProvider>
         </ThemeProvider>
@@ -58,4 +60,3 @@ export default function RootLayout() {
     </AuthProvider>
   );
 }
-

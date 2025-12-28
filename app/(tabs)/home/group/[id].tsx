@@ -3,6 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,8 +13,6 @@ import {
 import {
   ActivityIndicator,
   Button,
-  Card,
-  Chip,
   FAB,
   Surface,
   Text,
@@ -24,10 +23,10 @@ import { AwardCard } from "../../../../components/AwardCard";
 import { InviteModal } from "../../../../components/InviteModal";
 import { MemberAvatar } from "../../../../components/MemberAvatar";
 import { defaultGroupIcon, getIconComponent, IconName } from "../../../../constants/icons";
-import { theme as appTheme } from "../../../../constants/theme";
-import { useGroup } from "../../../../hooks";
+import { useAuth, useGroup } from "../../../../hooks";
 
 import { ConfirmDialog, DialogType } from "../../../../components/ui/ConfirmDialog";
+import { MenuOption, OptionsMenu } from "../../../../components/ui/OptionsMenu";
 import { useSnackbar } from "../../../../components/ui/SnackbarContext";
 
 export default function GroupDetailScreen() {
@@ -36,6 +35,7 @@ export default function GroupDetailScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const { showSnackbar } = useSnackbar();
+  const { user } = useAuth();
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   const [dialogConfig, setDialogConfig] = useState<{
@@ -54,7 +54,18 @@ export default function GroupDetailScreen() {
     onConfirm: () => {},
   });
 
+  const [optionsMenu, setOptionsMenu] = useState<{
+    visible: boolean;
+    title: string;
+    options: MenuOption[];
+  }>({
+    visible: false,
+    title: "",
+    options: []
+  });
+
   const hideDialog = () => setDialogConfig(prev => ({ ...prev, visible: false }));
+  const hideOptionsMenu = () => setOptionsMenu(prev => ({ ...prev, visible: false }));
 
   const { 
     group, 
@@ -62,9 +73,12 @@ export default function GroupDetailScreen() {
     error, 
     refetch, 
     removeMember,
+    updateMemberRole,
     isAdmin, 
     isOwner 
   } = useGroup(id);
+
+  const canCreateAward = isAdmin || group?.settings?.allow_member_nominations;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -126,7 +140,7 @@ export default function GroupDetailScreen() {
                   params: { id }
                 })}
               >
-                <Ionicons name="settings-outline" size={24} color={theme.colors.primary} />
+                <Ionicons name="settings-outline" size={24} color={theme.colors.onSurface} />
               </TouchableOpacity>
             ) : null,
         }}
@@ -150,157 +164,321 @@ export default function GroupDetailScreen() {
           }
         >
           {/* Group Header */}
-          <Surface style={[styles.headerCard, { backgroundColor: theme.colors.surfaceVariant }]} elevation={1}>
-            <View style={styles.headerRow}>
-              <Surface style={[styles.groupIcon, { backgroundColor: theme.colors.surface }]} elevation={0}>
-                {getIconComponent((group.icon as IconName) || defaultGroupIcon, 32, theme.colors.primary)}
+          <View style={styles.header}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 8 }}>
+              {isOwner ? 'Bienvenido a' : 'Miembro de'}
+            </Text>
+            <View style={styles.headerTitleRow}>
+              <Surface style={[styles.groupIconSurface, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]} elevation={2}>
+                {getIconComponent((group.icon as IconName) || defaultGroupIcon, 24, theme.colors.onSurface)}
               </Surface>
-              <View style={styles.headerInfo}>
-                <Text variant="titleLarge" style={{ fontWeight: "700" }}>
-                  {group.name}
-                </Text>
-                {group.description && (
-                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 2 }}>
-                    {group.description}
-                  </Text>
-                )}
-                <View style={styles.badgeRow}>
-                  {isOwner && (
-                    <Chip icon="star" compact style={{ backgroundColor: 'rgba(255, 215, 0, 0.15)' }}>
-                      Creador
-                    </Chip>
-                  )}
-                  {isAdmin && !isOwner && (
-                    <Chip icon="shield-check" compact>
-                      Admin
-                    </Chip>
-                  )}
-                  <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                    {group.member_count} miembros
-                  </Text>
-                </View>
-              </View>
+              <Text 
+                variant="headlineMedium" 
+                numberOfLines={1} 
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+                style={{ fontWeight: "800", letterSpacing: -0.5, marginLeft: 12, flex: 1 }}
+              >
+                {group.name}
+              </Text>
             </View>
-          </Surface>
+            {group.description && (
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 8 }}>
+                {group.description}
+              </Text>
+            )}
+          </View>
+
+          {/* Separator */}
+          <View style={{ height: 1, backgroundColor: theme.colors.surfaceVariant, marginBottom: 24 }} />
+
+          {/* Quick Stats - Compact */}
+          <View style={styles.statsRow}>
+            <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.secondaryContainer, borderWidth: 1 }]} elevation={1}>
+              <View style={[styles.statIconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]}>
+                <Ionicons name="people" size={18} color={theme.colors.onSecondaryContainer} />
+              </View>
+              <View>
+                <Text variant="titleLarge" style={{ fontWeight: "800", color: theme.colors.onSurface }}>
+                  {group.member_count}
+                </Text>
+                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, fontWeight: "600" }}>
+                  {group.member_count === 1 ? 'Miembro' : 'Miembros'}
+                </Text>
+              </View>
+            </Surface>
+
+            <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.secondaryContainer, borderWidth: 1 }]} elevation={1}>
+              <View style={[styles.statIconContainer, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary, borderWidth: 1 }]}>
+                <Ionicons name="trophy" size={18} color={theme.colors.onSecondaryContainer} />
+              </View>
+              <View>
+                <Text variant="titleLarge" style={{ fontWeight: "800", color: theme.colors.onSurface }}>
+                  {group.awards?.length || 0}
+                </Text>
+                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, fontWeight: "600" }}>
+                  {(group.awards?.length || 0) === 1 ? 'Premio' : 'Premios'}
+                </Text>
+              </View>
+            </Surface>
+          </View>
 
           {/* Members Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text variant="titleMedium" style={{ fontWeight: "600" }}>
+              <Text variant="titleLarge" style={{ fontWeight: "700" }}>
                 Miembros
               </Text>
-              <Button mode="text" compact onPress={handleInvite} icon="account-plus">
-                Invitar
-              </Button>
+              <TouchableOpacity onPress={handleInvite} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontWeight: "600", color: theme.colors.tertiary, marginRight: 4, fontSize: 14 }}>
+                  Invitar
+                </Text>
+                <Ionicons name="person-add" size={14} color={theme.colors.tertiary} />
+              </TouchableOpacity>
             </View>
 
-            <Card mode="outlined">
-              <Card.Content>
-                {group.members.length > 0 ? (
-                  <View style={styles.membersList}>
-                    {group.members.map((member) => {
-                      const isMemberOwner = member.role === 'owner';
-                      const canRemove = isAdmin && !isMemberOwner && (isOwner || member.role !== 'admin');
+            {group.members.length > 0 ? (
+              <Surface style={[styles.membersCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.secondaryContainer, borderWidth: 1 }]} elevation={1}>
+                {group.members.slice(0, 6).map((member, index) => {
+                  const isMemberOwner = member.role === 'owner';
+                  const isMe = user?.id === member.user_id;
+                  const canManage = (isOwner || (isAdmin && !isMemberOwner)) && !isMe;
+                  const isLast = index === Math.min(5, group.members.length - 1);
+                  
+                  const showOptions = () => {
+                    const actionOptions: { label: string; icon?: keyof typeof Ionicons.glyphMap; action: () => void; isDestructive?: boolean }[] = [];
+
+                    if (canManage) {
+                      if (member.role === 'member') {
+                        actionOptions.push({
+                          label: 'Hacer Administrador',
+                          icon: 'shield-checkmark-outline',
+                          action: () => {
+                            setDialogConfig({
+                              visible: true,
+                              title: "Hacer Administrador",
+                              message: `¿Quieres promover a ${member.display_name} a Administrador?`,
+                              confirmText: "Promover",
+                              type: "info",
+                              onConfirm: async () => {
+                                try {
+                                  await updateMemberRole(member.user_id, 'admin');
+                                  showSnackbar("Miembro promovido a Administrador", "success");
+                                } catch {
+                                  showSnackbar("Error al actualizar rol", "error");
+                                }
+                              }
+                            });
+                          }
+                        });
+                      } else if (member.role === 'admin') {
+                        actionOptions.push({
+                          label: 'Quitar Administrador',
+                          icon: 'shield-outline',
+                          action: () => {
+                            setDialogConfig({
+                              visible: true,
+                              title: "Quitar Administrador",
+                              message: `¿Quieres degradar a ${member.display_name} a miembro?`,
+                              confirmText: "Degradar",
+                              type: "warning",
+                              onConfirm: async () => {
+                                try {
+                                  await updateMemberRole(member.user_id, 'member');
+                                  showSnackbar("Administrador degradado a miembro", "success");
+                                } catch {
+                                  showSnackbar("Error al actualizar rol", "error");
+                                }
+                              }
+                            });
+                          }
+                        });
+                      }
                       
-                      return (
-                        <View key={member.user_id} style={styles.memberRow}>
-                          <MemberAvatar user={member} size="sm" />
-                          <View style={styles.memberInfo}>
-                            <Text variant="bodyMedium" style={{ fontWeight: "500" }}>
-                              {member.display_name}
-                            </Text>
-                            <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                              {member.role === 'owner' ? 'Propietario' : member.role === 'admin' ? 'Admin' : 'Miembro'}
-                            </Text>
-                          </View>
-                          {canRemove && (
-                            <TouchableOpacity
-                              style={styles.kickButton}
-                              onPress={() => {
-                                setDialogConfig({
-                                  visible: true,
-                                  title: "Expulsar miembro",
-                                  message: `¿Seguro que quieres expulsar a ${member.display_name} del grupo?`,
-                                  type: "warning",
-                                  confirmText: "Expulsar",
-                                  onConfirm: async () => {
-                                    try {
-                                      await removeMember(member.user_id);
-                                    } catch {
-                                      showSnackbar("No se pudo expulsar al miembro", "error");
-                                    }
-                                  }
-                                });
-                              }}
-                            >
-                              <Ionicons name="close-circle" size={24} color={theme.colors.error} />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant }}>
-                    No hay miembros aún
-                  </Text>
+                      actionOptions.push({
+                        label: 'Expulsar del grupo',
+                        icon: 'person-remove-outline',
+                        isDestructive: true,
+                        action: () => {
+                          setDialogConfig({
+                            visible: true,
+                            title: "Expulsar miembro",
+                            message: `¿Seguro que quieres expulsar a ${member.display_name} del grupo?`,
+                            type: "error",
+                            confirmText: "Expulsar",
+                            onConfirm: async () => {
+                              try {
+                                await removeMember(member.user_id);
+                                showSnackbar("Miembro expulsado", "success");
+                              } catch {
+                                showSnackbar("No se pudo expulsar al miembro", "error");
+                              }
+                            }
+                          });
+                        }
+                      });
+                    }
+
+                    if (actionOptions.length > 0) {
+                      setOptionsMenu({
+                        visible: true,
+                        title: `Gestionar a ${member.display_name}`,
+                        options: actionOptions
+                      });
+                    }
+                  };
+                  
+                  return (
+                    <View 
+                      key={member.user_id} 
+                      style={[
+                        styles.memberRowCompact, 
+                        !isLast && { borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant }
+                      ]}
+                    >
+                      <MemberAvatar user={member} size="sm" />
+                      <View style={styles.memberInfo}>
+                        <Text variant="bodyMedium" style={{ fontWeight: "600", color: theme.colors.onSurface }}>
+                          {member.display_name}
+                        </Text>
+                        <Text variant="labelSmall" style={{ color: theme.colors.primary }}>
+                          {member.role === 'owner' ? 'Propietario' : member.role === 'admin' ? 'Admin' : 'Miembro'}
+                        </Text>
+                      </View>
+                      {canManage && (
+                        <TouchableOpacity
+                          style={styles.optionsButton}
+                          onPress={showOptions}
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={20} color={theme.colors.onSurfaceVariant} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  );
+                })}
+                
+                {group.members.length > 6 && (
+                  <TouchableOpacity 
+                    style={styles.viewAllButton}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/home/group/members",
+                        params: { id }
+                      });
+                    }}
+                  >
+                    <Text style={{ color: theme.colors.onSurface, fontWeight: '600', fontSize: 14 }}>
+                      Ver lista completa ({group.members.length})
+                    </Text>
+                    <Ionicons name="chevron-forward" size={16} color={theme.colors.onSurface} />
+                  </TouchableOpacity>
                 )}
-              </Card.Content>
-            </Card>
+              </Surface>
+            ) : (
+              <Text variant="bodyMedium" style={{ textAlign: "center", color: theme.colors.onSurfaceVariant, padding: 20 }}>
+                No hay miembros aún
+              </Text>
+            )}
           </View>
 
           {/* Awards Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text variant="titleMedium" style={{ fontWeight: "600" }}>
-                Premios
-              </Text>
-              <Surface style={[styles.awardBadge, { backgroundColor: theme.colors.surfaceVariant }]} elevation={0}>
-                <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-                  {group.awards?.length || 0}
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text variant="titleLarge" style={{ fontWeight: "700" }}>
+                  Premios
                 </Text>
-              </Surface>
+                {group.awards && group.awards.length > 0 && (
+                  <View style={[styles.countBadge, { backgroundColor: theme.colors.primaryContainer }]}>
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurface, fontWeight: '700' }}>
+                      {group.awards.length}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </View>
 
             {!group.awards || group.awards.length === 0 ? (
-              <Card mode="outlined">
-                <Card.Content style={styles.emptyState}>
-                  {getIconComponent("trophy", 40, theme.colors.primary)}
-                  <Text variant="titleMedium">No hay premios aún</Text>
-                  <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant, marginTop: 4, textAlign: "center" }}>
-                    {isAdmin
-                      ? "Crea el primer premio para este grupo"
-                      : "El administrador aún no ha creado premios"}
-                  </Text>
-                  {isAdmin && (
-                    <Button mode="contained" onPress={handleCreateAward} style={{ marginTop: 16 }}>
-                      + Crear Premio
-                    </Button>
-                  )}
-                </Card.Content>
-              </Card>
-            ) : (
-              group.awards.map((award) => (
-                <AwardCard 
-                  key={award.id} 
-                  award={award}
-                  onPress={() => {
-                    router.push({
-                      pathname: "/home/award/[id]",
-                      params: { id: award.id, groupId: id }
-                    });
+              <Surface 
+                style={[
+                  styles.emptyCard, 
+                  { 
+                    backgroundColor: theme.colors.surface, 
+                    borderColor: theme.colors.secondaryContainer, 
+                    borderWidth: 1 
+                  }
+                ]} 
+                elevation={1}
+              >
+                <Text variant="titleMedium" style={{ marginTop: 16, fontWeight: "700" }}>
+                  Sin premios activos
+                </Text>
+                <Text 
+                  variant="bodyMedium" 
+                  style={{ 
+                    color: theme.colors.onSurfaceVariant, 
+                    marginTop: 8, 
+                    textAlign: "center", 
+                    maxWidth: 260, 
+                    lineHeight: 20 
                   }}
-                />
-              ))
+                >
+                  {canCreateAward
+                    ? "Los premios motivan al equipo. ¡Crea el primero!"
+                    : "Aún no se han creado premios en este grupo."}
+                </Text>
+                {canCreateAward && (
+                  <TouchableOpacity 
+                    onPress={handleCreateAward}
+                    style={[
+                      styles.createButton,
+                      { 
+                        backgroundColor: theme.colors.primaryContainer,
+                        borderColor: theme.colors.primary,
+                      }
+                    ]}
+                  >
+                    <Text style={{ color: theme.colors.onSurface, fontWeight: '600', marginLeft: 8 }}>
+                      + Crear un Premio
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </Surface>
+            ) : (
+              <View style={{ gap: 12 }}>
+                {group.awards.map((award) => (
+                  <AwardCard 
+                    key={award.id} 
+                    award={award}
+                    nomineeCount={(award as any).nominee_count}
+                    onPress={() => {
+                      router.push({
+                        pathname: "/home/award/[id]",
+                        params: { id: award.id, groupId: id }
+                      });
+                    }}
+                  />
+                ))}
+              </View>
             )}
           </View>
         </ScrollView>
 
-        {/* FAB for admins */}
-        {isAdmin && group.awards && group.awards.length > 0 && (
+        {/* FAB for creators */}
+        {canCreateAward && group.awards && group.awards.length > 0 && (
           <FAB
             icon="plus"
-            style={[styles.fab, { bottom: 24 + insets.bottom }]}
+            label={Platform.OS === 'ios' ? "Nuevo Premio" : undefined}
+            style={[
+              styles.fab, 
+              { 
+                bottom: 24 + insets.bottom,
+                backgroundColor: theme.colors.primaryContainer,
+                borderColor: theme.colors.primary,
+                borderWidth: 1,
+              }
+            ]}
+            color={theme.colors.onPrimaryContainer}
             onPress={handleCreateAward}
           />
         )}
@@ -313,6 +491,12 @@ export default function GroupDetailScreen() {
           groupName={group.name}
         />
       </View>
+      <OptionsMenu
+        visible={optionsMenu.visible}
+        title={optionsMenu.title}
+        options={optionsMenu.options}
+        onDismiss={hideOptionsMenu}
+      />
       <ConfirmDialog
         visible={dialogConfig.visible}
         title={dialogConfig.title}
@@ -336,7 +520,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: appTheme.spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 100,
   },
   centerContent: {
     flex: 1,
@@ -347,79 +533,125 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: appTheme.spacing.lg,
+    padding: 20,
   },
   headerButton: {
     padding: 8,
   },
-  headerCard: {
-    borderRadius: appTheme.borderRadius.lg,
-    padding: appTheme.spacing.lg,
-    marginBottom: appTheme.spacing.lg,
+  // Header
+  header: {
+    marginBottom: 24,
+    marginTop: 10,
   },
-  headerRow: {
+  headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
   },
-  groupIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: appTheme.borderRadius.lg,
+  groupIconSurface: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: appTheme.spacing.md,
   },
-  groupIconText: {
-    fontSize: 32,
-  },
-  headerInfo: {
-    flex: 1,
-  },
-  badgeRow: {
+  // Stats Row - Compact horizontal
+  statsRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    gap: 8,
+    gap: 10,
+    marginBottom: 24,
   },
+  statCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Sections
   section: {
-    marginBottom: appTheme.spacing.xl,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: appTheme.spacing.md,
-  },
-  awardBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: appTheme.borderRadius.full,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   membersList: {
-    gap: appTheme.spacing.xs,
+    gap: 12,
+  },
+  membersCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  memberRowCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
   memberRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: appTheme.spacing.xs,
+    padding: 14,
+    borderRadius: 16,
   },
   memberInfo: {
     flex: 1,
-    marginLeft: appTheme.spacing.sm,
+    marginLeft: 12,
   },
-  kickButton: {
-    padding: appTheme.spacing.xs,
+  optionsButton: {
+    padding: 8,
   },
-  emptyState: {
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+    gap: 4,
+  },
+  emptyCard: {
+    borderRadius: 24,
+    padding: 32,
+    paddingTop: 16,
     alignItems: "center",
-    paddingVertical: appTheme.spacing.md,
   },
-  emptyIcon: {
-    fontSize: 40,
-    marginBottom: appTheme.spacing.sm,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
   fab: {
     position: "absolute",
-    right: 24,
+    right: 20,
+    borderRadius: 16,
+  },
+  countBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  createButton: {
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    borderWidth: 1,
   },
 });
