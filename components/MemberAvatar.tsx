@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import React from 'react';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Colors } from '../constants/Colors';
@@ -8,7 +9,7 @@ type UserLike = Profile | GroupMemberView | { id: string; display_name: string; 
 
 interface MemberAvatarProps {
   user: UserLike;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   showName?: boolean;
   style?: ViewStyle;
 }
@@ -46,8 +47,8 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
   style,
 }) => {
   const name = getUserName(user);
-  const sizeValue = size === 'sm' ? 32 : size === 'md' ? 40 : 56;
-  const fontSize = size === 'sm' ? 12 : size === 'md' ? 14 : 20;
+  const sizeValue = size === 'sm' ? 32 : size === 'md' ? 40 : size === 'lg' ? 56 : 100;
+  const fontSize = size === 'sm' ? 12 : size === 'md' ? 14 : size === 'lg' ? 20 : 32;
   const backgroundColor = getAvatarColor(name);
 
   return (
@@ -60,12 +61,22 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({
             height: sizeValue,
             borderRadius: sizeValue / 2,
             backgroundColor,
+            overflow: 'hidden',
           },
         ]}
       >
-        <Text style={[styles.initials, { fontSize }]}>
-          {getInitials(name)}
-        </Text>
+        {user.avatar_url ? (
+          <Image
+            source={{ uri: user.avatar_url }}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            transition={200}
+          />
+        ) : (
+          <Text style={[styles.initials, { fontSize }]}>
+            {getInitials(name)}
+          </Text>
+        )}
       </View>
       {showName && (
         <Text style={styles.name} numberOfLines={1}>

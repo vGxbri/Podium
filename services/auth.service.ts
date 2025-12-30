@@ -109,6 +109,34 @@ export const authService = {
   },
 
   /**
+   * Upload avatar image and return public URL
+   */
+  async uploadAvatar(uri: string): Promise<string> {
+    const { decode } = await import('base64-arraybuffer');
+    const FileSystem = await import('expo-file-system/legacy');
+    
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error('Not authenticated');
+
+    const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    const contentType = fileExt === 'png' ? 'image/png' : 'image/jpeg';
+
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: 'base64',
+    });
+
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, decode(base64), { contentType, upsert: true });
+
+    if (error) throw error;
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+    return data.publicUrl;
+  },
+
+  /**
    * Send password reset email
    */
   async resetPassword(email: string) {

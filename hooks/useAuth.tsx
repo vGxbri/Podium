@@ -33,22 +33,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load session on mount
+  // Initialize auth state via onAuthStateChange (single source of truth)
   useEffect(() => {
-    loadSession();
-
-    // Subscribe to auth changes
+    // Subscribe to auth changes - this handles INITIAL_SESSION automatically
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         console.log('Auth state changed:', event);
+        
         setSession(newSession);
         setUser(newSession?.user ?? null);
         
         if (newSession?.user) {
-          await loadProfile();
+          // Load profile in background, don't block auth state
+          loadProfile();
         } else {
           setProfile(null);
         }
+        
+        // Mark loading as complete after first event (INITIAL_SESSION or SIGNED_OUT)
+        setIsLoading(false);
       }
     );
 
@@ -56,36 +59,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
       subscription.unsubscribe();
     };
   }, []);
-
-  const loadSession = async () => {
-    try {
-      setIsLoading(true);
-      // Create a timeout promise that rejects after 5 seconds
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Session load timed out')), 5000);
-      });
-
-      // Race between getSession and timeout
-      const currentSession = await Promise.race([
-        authService.getSession(),
-        timeoutPromise
-      ]) as Session | null;
-      
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      
-      if (currentSession?.user) {
-        await loadProfile();
-      }
-    } catch (error) {
-      console.error('Error loading session:', error);
-      // If error (including timeout), we assume no session or let user login again
-      setSession(null);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const loadProfile = async () => {
     try {

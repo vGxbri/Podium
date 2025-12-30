@@ -12,6 +12,7 @@ import {
   Animated,
   Modal,
   Pressable,
+  TextInput as RNTextInput,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -23,7 +24,6 @@ import {
   Portal,
   Surface,
   Text,
-  TextInput,
   useTheme
 } from "react-native-paper";
 
@@ -88,19 +88,14 @@ export default function AwardDetailScreen() {
 
 
   const [showStartVotingModal, setShowStartVotingModal] = useState(false);
-  const [deadlineMode, setDeadlineMode] = useState<'24h' | '48h' | '1w' | 'custom'>('24h');
-  const [customDate, setCustomDate] = useState("");
-  const [customTime, setCustomTime] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   
   // Audio nomination temp state
   const [showAudioTitleModal, setShowAudioTitleModal] = useState(false);
-  const [audioTitle, setAudioTitle] = useState("");
   const [tempAudio, setTempAudio] = useState<{ uri: string; mimeType?: string; name: string } | null>(null);
 
   // Text nomination state
   const [showTextModal, setShowTextModal] = useState(false);
-  const [textNomination, setTextNomination] = useState("");
 
   const fetchAward = React.useCallback(async () => {
     try {
@@ -193,7 +188,11 @@ export default function AwardDetailScreen() {
     });
   };
 
-  const handleStartVoting = async () => {
+  const handleStartVoting = async (
+    deadlineMode: '24h' | '48h' | '1w' | 'custom',
+    customDate: string,
+    customTime: string
+  ) => {
     if (!award) return;
 
     let deadlineDate: Date | undefined;
@@ -364,7 +363,6 @@ export default function AwardDetailScreen() {
 
          // Open modal to ask for title
          setTempAudio({ uri, mimeType, name: fileName });
-         setAudioTitle(""); // Reset title
          setShowAudioTitleModal(true);
          return; // Stop here, wait for modal submit
       } else {
@@ -402,9 +400,9 @@ export default function AwardDetailScreen() {
     }
   };
 
-  const handleSubmitAudioNomination = async () => {
+  const handleSubmitAudioNomination = async (title: string) => {
     if (!tempAudio || !award || !user) return;
-    if (!audioTitle.trim()) {
+    if (!title.trim()) {
         showSnackbar("Por favor añade un título al audio", "error");
         return;
     }
@@ -415,12 +413,11 @@ export default function AwardDetailScreen() {
         const publicUrl = await awardsService.uploadNomineeMedia(award.id, tempAudio.uri, tempAudio.mimeType, tempAudio.name);
         
         // Add nominee with Reason = Title
-        await awardsService.addNominee(award.id, user.id, audioTitle, publicUrl);
+        await awardsService.addNominee(award.id, user.id, title, publicUrl);
 
         showSnackbar("Audio añadido correctamente", "success");
         setShowAudioTitleModal(false);
         setTempAudio(null);
-        setAudioTitle("");
         fetchAward();
     } catch (error: any) {
         showSnackbar(error.message, "error");
@@ -429,15 +426,14 @@ export default function AwardDetailScreen() {
     }
   };
 
-  const handleSubmitTextNomination = async () => {
-    if (!textNomination.trim() || !award || !user) return;
+  const handleSubmitTextNomination = async (text: string) => {
+    if (!text.trim() || !award || !user) return;
     
     try {
       setActionLoading(true);
-      await awardsService.addNominee(award.id, user.id, undefined, textNomination);
+      await awardsService.addNominee(award.id, user.id, undefined, text);
       showSnackbar("Texto añadido correctamente", "success");
       setShowTextModal(false);
-      setTextNomination("");
       fetchAward();
     } catch (error: any) {
       showSnackbar(error.message, "error");
@@ -796,10 +792,27 @@ export default function AwardDetailScreen() {
               ]} 
               elevation={1}
             >
+              {/* Edit Award Button - Always visible for admins */}
+              <TouchableOpacity 
+                style={[styles.adminButton, { backgroundColor: theme.colors.surfaceVariant }]}
+                onPress={() => router.push(`/home/award/edit?id=${id}&groupId=${groupId}`)}
+              >
+                <Ionicons name="pencil-outline" size={24} color={theme.colors.onSurfaceVariant} />
+                <View style={{ marginLeft: 14, flex: 1 }}>
+                  <Text style={{ fontWeight: '600', color: theme.colors.onSurface }}>
+                    Editar Premio
+                  </Text>
+                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    Cambiar icono, nombre o descripción
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.onSurfaceVariant} />
+              </TouchableOpacity>
+
               {award.status === 'draft' && (
                 <>
                   <TouchableOpacity 
-                    style={[styles.adminButton, { backgroundColor: theme.colors.primaryContainer }]}
+                    style={[styles.adminButton, { backgroundColor: theme.colors.primaryContainer, borderTopWidth: 1, borderTopColor: theme.colors.surfaceVariant }]}
                     onPress={() => setShowStartVotingModal(true)}
                   >
                     <Ionicons name="play-circle" size={24} color={theme.colors.onPrimaryContainer} />
@@ -901,12 +914,6 @@ export default function AwardDetailScreen() {
         onClose={() => setShowStartVotingModal(false)}
         onConfirm={handleStartVoting}
         award={award}
-        deadlineMode={deadlineMode}
-        setDeadlineMode={setDeadlineMode}
-        customDate={customDate}
-        setCustomDate={setCustomDate}
-        customTime={customTime}
-        setCustomTime={setCustomTime}
       />
 
       <Modal
@@ -942,8 +949,6 @@ export default function AwardDetailScreen() {
         visible={showTextModal}
         onClose={() => setShowTextModal(false)}
         onConfirm={handleSubmitTextNomination}
-        textNomination={textNomination}
-        setTextNomination={setTextNomination}
         actionLoading={actionLoading}
       />
 
@@ -966,8 +971,6 @@ export default function AwardDetailScreen() {
         visible={showAudioTitleModal}
         onClose={() => setShowAudioTitleModal(false)}
         onConfirm={handleSubmitAudioNomination}
-        audioTitle={audioTitle}
-        setAudioTitle={setAudioTitle}
         audioFileName={tempAudio?.name || 'Audio'}
         actionLoading={actionLoading}
       />
@@ -993,14 +996,8 @@ export default function AwardDetailScreen() {
 interface StartVotingModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (mode: '24h' | '48h' | '1w' | 'custom', customDate: string, customTime: string) => void;
   award: AwardWithNominees | null;
-  deadlineMode: '24h' | '48h' | '1w' | 'custom';
-  setDeadlineMode: (mode: '24h' | '48h' | '1w' | 'custom') => void;
-  customDate: string;
-  setCustomDate: (date: string) => void;
-  customTime: string;
-  setCustomTime: (time: string) => void;
 }
 
 function StartVotingModal({
@@ -1008,18 +1005,28 @@ function StartVotingModal({
   onClose,
   onConfirm,
   award,
-  deadlineMode,
-  setDeadlineMode,
-  customDate,
-  setCustomDate,
-  customTime,
-  setCustomTime,
 }: StartVotingModalProps) {
   const theme = useTheme();
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const translateYAnim = useRef(new Animated.Value(40)).current;
   const [shouldRender, setShouldRender] = useState(visible);
+  
+  // Local state for deadline settings - prevents parent re-renders
+  const [deadlineMode, setDeadlineMode] = useState<'24h' | '48h' | '1w' | 'custom'>('24h');
+  
+  // Use refs for uncontrolled inputs to avoid re-renders while typing
+  const dateRef = useRef("");
+  const timeRef = useRef("");
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (visible) {
+      setDeadlineMode('24h');
+      dateRef.current = "";
+      timeRef.current = "";
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -1198,31 +1205,49 @@ function StartVotingModal({
                     <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
                       Fecha
                     </Text>
-                    <TextInput
-                      placeholder="DD/MM/YYYY"
-                      mode="outlined"
-                      value={customDate}
-                      onChangeText={setCustomDate}
-                      style={{ backgroundColor: theme.colors.surface }}
-                      outlineStyle={{ borderRadius: 10 }}
-                      dense
-                      left={<TextInput.Icon icon="calendar" size={18} color={theme.colors.primary} />}
-                    />
+                    <View style={{
+                      borderWidth: 1,
+                      borderColor: theme.colors.outline,
+                      borderRadius: 10,
+                      backgroundColor: theme.colors.surface,
+                      paddingHorizontal: 12,
+                      height: 48,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}>
+                      <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                      <RNTextInput
+                        placeholder="DD/MM/YYYY"
+                        placeholderTextColor={theme.colors.onSurfaceVariant}
+                        defaultValue=""
+                        onChangeText={(text) => dateRef.current = text}
+                        style={{ color: theme.colors.onSurface, fontSize: 14, flex: 1, paddingVertical: 0 }}
+                      />
+                    </View>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, marginBottom: 4 }}>
                       Hora
                     </Text>
-                    <TextInput
-                      placeholder="HH:MM"
-                      mode="outlined"
-                      value={customTime}
-                      onChangeText={setCustomTime}
-                      style={{ backgroundColor: theme.colors.surface }}
-                      outlineStyle={{ borderRadius: 10 }}
-                      dense
-                      left={<TextInput.Icon icon="clock-outline" size={18} color={theme.colors.primary} />}
-                    />
+                    <View style={{
+                      borderWidth: 1,
+                      borderColor: theme.colors.outline,
+                      borderRadius: 10,
+                      backgroundColor: theme.colors.surface,
+                      paddingHorizontal: 12,
+                      height: 48,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    }}>
+                      <Ionicons name="time-outline" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
+                      <RNTextInput
+                        placeholder="HH:MM"
+                        placeholderTextColor={theme.colors.onSurfaceVariant}
+                        defaultValue=""
+                        onChangeText={(text) => timeRef.current = text}
+                        style={{ color: theme.colors.onSurface, fontSize: 14, flex: 1, paddingVertical: 0 }}
+                      />
+                    </View>
                   </View>
                 </View>
               )}
@@ -1242,14 +1267,15 @@ function StartVotingModal({
             </TouchableOpacity>
             {canStart && (
               <TouchableOpacity
-                style={[modalStyles.confirmButton, { backgroundColor: theme.colors.primaryContainer, borderColor: theme.colors.primary }]}
+                style={[modalStyles.confirmButton, { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}
                 onPress={() => {
-                  onConfirm();
+                  onConfirm(deadlineMode, dateRef.current, timeRef.current);
+                  onClose();
                 }}
                 activeOpacity={0.7}
               >
-                <Ionicons name="play" size={16} color={theme.colors.onSurface} style={{ marginRight: 6 }} />
-                <Text variant="labelLarge" style={{ color: theme.colors.onSurface, fontWeight: '700' }}>
+                <Ionicons name="play" size={16} color={theme.colors.onPrimary} style={{ marginRight: 6 }} />
+                <Text variant="labelLarge" style={{ color: theme.colors.onPrimary, fontWeight: '700' }}>
                   Comenzar
                 </Text>
               </TouchableOpacity>
@@ -1267,9 +1293,7 @@ function StartVotingModal({
 interface TextNominationModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: () => void;
-  textNomination: string;
-  setTextNomination: (text: string) => void;
+  onConfirm: (text: string) => void;
   actionLoading: boolean;
 }
 
@@ -1277,8 +1301,6 @@ function TextNominationModal({
   visible,
   onClose,
   onConfirm,
-  textNomination,
-  setTextNomination,
   actionLoading,
 }: TextNominationModalProps) {
   const theme = useTheme();
@@ -1286,6 +1308,18 @@ function TextNominationModal({
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const translateYAnim = useRef(new Animated.Value(40)).current;
   const [shouldRender, setShouldRender] = useState(visible);
+  
+  // Uncontrolled input to prevent double-typing/cursor jumps
+  const textRef = useRef("");
+  const [charCount, setCharCount] = useState(0);
+
+  // Reset text when modal opens
+  useEffect(() => {
+    if (visible) {
+      textRef.current = "";
+      setCharCount(0);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -1338,7 +1372,9 @@ function TextNominationModal({
 
   if (!shouldRender) return null;
 
-  const canSubmit = textNomination.trim().length > 0;
+  if (!shouldRender) return null;
+
+  const canSubmit = charCount > 0;
 
   return (
     <Portal>
@@ -1395,22 +1431,37 @@ function TextNominationModal({
 
           {/* Text Input */}
           <View style={{ width: '100%', marginBottom: 20 }}>
-            <TextInput
-              placeholder="Escribe tu texto aquí..."
-              value={textNomination}
-              onChangeText={setTextNomination}
-              multiline
-              numberOfLines={4}
-              mode="outlined"
-              style={{ backgroundColor: theme.colors.surface, minHeight: 100 }}
-              outlineStyle={{ borderRadius: 14 }}
-              contentStyle={{ paddingTop: 12 }}
-            />
+            <View style={{
+              borderWidth: 1,
+              borderColor: theme.colors.outline,
+              borderRadius: 14,
+              backgroundColor: theme.colors.surface,
+              minHeight: 120, // Slightly taller for better UX
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}>
+              <RNTextInput
+                placeholder="Escribe tu texto aquí..."
+                placeholderTextColor={theme.colors.onSurfaceVariant}
+                defaultValue=""
+                onChangeText={(text) => {
+                   textRef.current = text;
+                   setCharCount(text.length);
+                }}
+                multiline
+                style={{ 
+                  color: theme.colors.onSurface,
+                  fontSize: 16,
+                  textAlignVertical: 'top', // Important for Android multiline
+                  flex: 1,
+                }}
+              />
+            </View>
             <Text 
               variant="labelSmall" 
               style={{ color: theme.colors.onSurfaceVariant, textAlign: 'right', marginTop: 6 }}
             >
-              {textNomination.length} caracteres
+              {charCount} caracteres
             </Text>
           </View>
 
@@ -1434,7 +1485,7 @@ function TextNominationModal({
                   opacity: canSubmit ? 1 : 0.6,
                 }
               ]}
-              onPress={onConfirm}
+              onPress={() => onConfirm(textRef.current)}
               disabled={!canSubmit || actionLoading}
               activeOpacity={0.7}
             >
@@ -1466,9 +1517,7 @@ function TextNominationModal({
 interface AudioTitleModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: () => void;
-  audioTitle: string;
-  setAudioTitle: (text: string) => void;
+  onConfirm: (title: string) => void;
   audioFileName: string;
   actionLoading: boolean;
 }
@@ -1477,8 +1526,6 @@ function AudioTitleModal({
   visible,
   onClose,
   onConfirm,
-  audioTitle,
-  setAudioTitle,
   audioFileName,
   actionLoading,
 }: AudioTitleModalProps) {
@@ -1487,6 +1534,18 @@ function AudioTitleModal({
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
   const translateYAnim = useRef(new Animated.Value(40)).current;
   const [shouldRender, setShouldRender] = useState(visible);
+  
+  // Uncontrolled input pattern
+  const titleRef = useRef("");
+  const [hasText, setHasText] = useState(false);
+
+  // Reset title when modal opens
+  useEffect(() => {
+    if (visible) {
+      titleRef.current = "";
+      setHasText(false);
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -1539,7 +1598,7 @@ function AudioTitleModal({
 
   if (!shouldRender) return null;
 
-  const canSubmit = audioTitle.trim().length > 0;
+  const canSubmit = hasText;
 
   return (
     <Portal>
@@ -1611,15 +1670,32 @@ function AudioTitleModal({
 
           {/* Text Input */}
           <View style={{ width: '100%', marginBottom: 20 }}>
-            <TextInput
-              placeholder="Dale un nombre a tu audio..."
-              value={audioTitle}
-              onChangeText={setAudioTitle}
-              mode="outlined"
-              style={{ backgroundColor: theme.colors.surface }}
-              outlineStyle={{ borderRadius: 14 }}
-              left={<TextInput.Icon icon="pencil" size={18} color={theme.colors.primary} />}
-            />
+            <View style={{
+              borderWidth: 1,
+              borderColor: theme.colors.outline,
+              borderRadius: 14,
+              backgroundColor: theme.colors.surface,
+              paddingHorizontal: 12,
+              height: 56, // Standard height
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+              <Ionicons name="pencil" size={18} color={theme.colors.primary} style={{ marginRight: 8 }} />
+              <RNTextInput
+                placeholder="Dale un nombre a tu audio..."
+                placeholderTextColor={theme.colors.onSurfaceVariant}
+                defaultValue=""
+                onChangeText={(text) => {
+                   titleRef.current = text;
+                   setHasText(text.trim().length > 0);
+                }}
+                style={{ 
+                  color: theme.colors.onSurface,
+                  fontSize: 16,
+                  flex: 1,
+                }}
+              />
+            </View>
           </View>
 
           {/* Actions */}
@@ -1642,7 +1718,7 @@ function AudioTitleModal({
                   opacity: canSubmit ? 1 : 0.6,
                 }
               ]}
-              onPress={onConfirm}
+              onPress={() => onConfirm(titleRef.current)}
               disabled={!canSubmit || actionLoading}
               activeOpacity={0.7}
             >
