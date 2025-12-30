@@ -54,7 +54,7 @@ export const awardsService = {
         user:profiles!nominees_user_id_fkey (*)
       `)
       .eq('award_id', awardId)
-      .order('vote_count', { ascending: false });
+      .order('created_at', { ascending: true });
 
     if (nomineesError) throw nomineesError;
 
@@ -92,10 +92,13 @@ export const awardsService = {
         status: 'draft',
         created_by: user.id,
         voting_settings: {
+          nominees_can_vote: false,
           allow_self_vote: false,
+          allow_vote_change: false,
           max_votes_per_user: 1,
           anonymous_voting: true,
           show_results_before_end: false,
+          ...input.voting_settings, // Override with provided settings
         },
       })
       .select()
@@ -215,19 +218,21 @@ export const awardsService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    // Get award details to check type
+    // Get award details including voting settings
     const { data: award, error: awardFetchError } = await supabase
       .from('awards')
-      .select('vote_type')
+      .select('vote_type, voting_settings')
       .eq('id', awardId)
       .single();
 
     if (awardFetchError) throw awardFetchError;
 
-    // Only prevent self-voting if NOT a photo, video, audio or text award
-    if (!['photo', 'video', 'audio', 'text'].includes(award.vote_type)) {
+    const votingSettings = award.voting_settings || {};
+
+    // For person-type awards, check nominee voting restrictions
+    if (award.vote_type === 'person') {
       // Check if user is a nominee for this award
-      const { data: nomineeCheck, error: checkError } = await supabase
+      const { data: userNominee, error: checkError } = await supabase
         .from('nominees')
         .select('id')
         .eq('award_id', awardId)
@@ -236,26 +241,96 @@ export const awardsService = {
 
       if (checkError) throw checkError;
 
-      if (nomineeCheck) {
-        throw new Error('No puedes votar en un premio donde estás nominado.');
+      // If user is a nominee
+      if (userNominee) {
+        // Check if nominees can vote at all
+        if (!votingSettings.nominees_can_vote) {
+          throw new Error('No puedes votar en este premio porque estás nominado.');
+        }
+
+        // Check if self-voting is allowed (if voting for themselves)
+        if (nomineeId === userNominee.id && !votingSettings.allow_self_vote) {
+          throw new Error('No puedes votarte a ti mismo.');
+        }
       }
+    }
+
+    if (votingSettings.allow_vote_change) {
+      // Use UPSERT to handle both new votes and changing votes atomically
+      const { error } = await supabase
+        .from('votes')
+        .upsert({
+          award_id: awardId,
+          voter_id: user.id,
+          nominee_id: nomineeId,
+          points: 1,
+        }, { 
+          onConflict: 'award_id, voter_id' 
+        });
+
+      if (error) throw error;
+    } else {
+      // If vote change NOT allowed, check existence first or rely on unique constraint
+      const { data: existingVote, error: existingVoteError } = await supabase
+        .from('votes')
+        .select('id')
+        .eq('award_id', awardId)
+        .eq('voter_id', user.id)
+        .maybeSingle();
+
+      if (existingVoteError) throw existingVoteError;
+
+      if (existingVote) {
+        throw new Error('Ya has votado para este premio.');
+      }
+
+      const { error } = await supabase
+        .from('votes')
+        .insert({
+          award_id: awardId,
+          voter_id: user.id,
+          nominee_id: nomineeId,
+          points: 1,
+        });
+
+      if (error) {
+        if (error.code === '23505') { // Unique violation
+          throw new Error('Ya has votado para este premio.');
+        }
+        throw error;
+      }
+    }
+  },
+
+  /**
+   * Remove a vote (retract)
+   */
+  async removeVote(awardId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not authenticated');
+
+    // Get award details to check settings
+    const { data: award, error: awardFetchError } = await supabase
+      .from('awards')
+      .select('voting_settings')
+      .eq('id', awardId)
+      .single();
+
+    if (awardFetchError) throw awardFetchError;
+
+    const votingSettings = award.voting_settings || {};
+
+    if (!votingSettings.allow_vote_change) {
+      throw new Error('No se permite cambiar o retirar el voto en este premio.');
     }
 
     const { error } = await supabase
       .from('votes')
-      .insert({
-        award_id: awardId,
-        voter_id: user.id,
-        nominee_id: nomineeId,
-        points: 1,
-      });
+      .delete()
+      .eq('award_id', awardId)
+      .eq('voter_id', user.id);
 
-    if (error) {
-      if (error.code === '23505') { // Unique violation
-        throw new Error('Ya has votado para este premio.');
-      }
-      throw error;
-    }
+    if (error) throw error;
   },
 
   /**

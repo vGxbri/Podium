@@ -32,7 +32,9 @@ export interface GroupSettings {
 }
 
 export interface VotingSettings {
-  allow_self_vote: boolean;
+  nominees_can_vote: boolean;  // Can nominees vote in this award? (default: false)
+  allow_self_vote: boolean;    // Can a nominee vote for themselves? (only if nominees_can_vote is true)
+  allow_vote_change: boolean;  // Can users change their vote after casting? (default: false)
   max_votes_per_user: number;
   anonymous_voting: boolean;
   show_results_before_end: boolean;
@@ -229,6 +231,7 @@ export interface CreateAwardInput {
   category_id?: string;
   vote_type?: VoteType;
   nominee_ids: string[];
+  voting_settings?: Partial<VotingSettings>;
 }
 
 export interface UpdateAwardInput {
@@ -236,6 +239,7 @@ export interface UpdateAwardInput {
   description?: string | null;
   icon?: string;
   status?: AwardStatus;
+  voting_settings?: Partial<VotingSettings>;
 }
 
 // Database schema type for Supabase client

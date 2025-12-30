@@ -48,6 +48,9 @@ export default function CreateAwardScreen() {
   const [selectedIcon, setSelectedIcon] = useState<IconName>(defaultAwardIcon);
   const [selectedNominees, setSelectedNominees] = useState<string[]>([]);
   const [selectedVoteType, setSelectedVoteType] = useState<VoteType>('person');
+  const [nomineesCanVote, setNomineesCanVote] = useState(false);
+  const [allowSelfVote, setAllowSelfVote] = useState(false);
+  const [allowVoteChange, setAllowVoteChange] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const withOpacity = (color: string, opacity: number) => {
@@ -122,6 +125,13 @@ export default function CreateAwardScreen() {
         icon: selectedIcon,
         vote_type: selectedVoteType,
         nominee_ids: needsNominees ? selectedNominees : [],
+        voting_settings: {
+          allow_vote_change: allowVoteChange,
+          ...(needsNominees && {
+            nominees_can_vote: nomineesCanVote,
+            allow_self_vote: nomineesCanVote && allowSelfVote,
+          }),
+        },
       });
       
       showSnackbar("¡Premio creado!", "success");
@@ -395,6 +405,117 @@ export default function CreateAwardScreen() {
               </Text>
             </Surface>
           )}
+
+          {/* Unified Voting Options Section (At the bottom) */}
+          <View style={[styles.section, { marginBottom: 32 }]}>
+            <Text variant="titleMedium" style={{ fontWeight: "600", marginBottom: 12 }}>
+              Opciones de configuración
+            </Text>
+            <Surface 
+              style={[
+                styles.nomineesCard, 
+                { 
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.secondaryContainer, 
+                  borderWidth: 1,
+                  padding: 4 // Reduced padding for better list appearance
+                }
+              ]} 
+              elevation={1}
+            >
+              {/* Allow Vote Change Toggle */}
+              <TouchableOpacity
+                style={[
+                  styles.voteTypeRow,
+                  { borderBottomWidth: (selectedVoteType === 'person' && nomineesCanVote) || (selectedVoteType === 'person') ? 1 : 0, borderBottomColor: theme.colors.surfaceVariant }
+                ]}
+                onPress={() => setAllowVoteChange(!allowVoteChange)}
+              >
+                <View style={[
+                  styles.voteTypeIconContainer,
+                  { backgroundColor: allowVoteChange ? theme.colors.primary : theme.colors.surfaceVariant }
+                ]}>
+                  <Ionicons name="sync" size={18} color={allowVoteChange ? theme.colors.onPrimary : theme.colors.onSurfaceVariant} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 14 }}>
+                  <Text variant="bodyLarge" style={{ fontWeight: allowVoteChange ? '600' : '400', color: theme.colors.onSurface }}>
+                    Permitir cambiar el voto
+                  </Text>
+                  <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    Los usuarios pueden modificar su voto después
+                  </Text>
+                </View>
+                <Ionicons 
+                  name={allowVoteChange ? "checkbox" : "square-outline"} 
+                  size={24} 
+                  color={allowVoteChange ? theme.colors.primary : theme.colors.onSurfaceVariant} 
+                />
+              </TouchableOpacity>
+
+              {/* Nominee Voting Toggles - Only for 'person' vote type */}
+              {selectedVoteType === 'person' && (
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.voteTypeRow,
+                      { borderBottomWidth: allowSelfVote || nomineesCanVote ? 1 : 0, borderBottomColor: theme.colors.surfaceVariant }
+                    ]}
+                    onPress={() => {
+                      setNomineesCanVote(!nomineesCanVote);
+                      if (nomineesCanVote) setAllowSelfVote(false);
+                    }}
+                  >
+                    <View style={[
+                      styles.voteTypeIconContainer,
+                      { backgroundColor: nomineesCanVote ? theme.colors.primary : theme.colors.surfaceVariant }
+                    ]}>
+                      <Ionicons name="hand-left" size={18} color={nomineesCanVote ? theme.colors.onPrimary : theme.colors.onSurfaceVariant} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 14 }}>
+                      <Text variant="bodyLarge" style={{ fontWeight: nomineesCanVote ? '600' : '400', color: theme.colors.onSurface }}>
+                        Los nominados pueden votar
+                      </Text>
+                      <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                        Permitir que las personas nominadas voten
+                      </Text>
+                    </View>
+                    <Ionicons 
+                      name={nomineesCanVote ? "checkbox" : "square-outline"} 
+                      size={24} 
+                      color={nomineesCanVote ? theme.colors.primary : theme.colors.onSurfaceVariant} 
+                    />
+                  </TouchableOpacity>
+
+                  {nomineesCanVote && (
+                    <TouchableOpacity
+                      style={[styles.voteTypeRow, { borderBottomWidth: 0 }]}
+                      onPress={() => setAllowSelfVote(!allowSelfVote)}
+                    >
+                      <View style={[
+                        styles.voteTypeIconContainer,
+                        { backgroundColor: allowSelfVote ? theme.colors.primary : theme.colors.surfaceVariant }
+                      ]}>
+                        <Ionicons name="person" size={18} color={allowSelfVote ? theme.colors.onPrimary : theme.colors.onSurfaceVariant} />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 14 }}>
+                        <Text variant="bodyLarge" style={{ fontWeight: allowSelfVote ? '600' : '400', color: theme.colors.onSurface }}>
+                          Pueden votarse a sí mismos
+                        </Text>
+                        <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                          Permitir que un nominado vote por sí mismo
+                        </Text>
+                      </View>
+                      <Ionicons 
+                        name={allowSelfVote ? "checkbox" : "square-outline"} 
+                        size={24} 
+                        color={allowSelfVote ? theme.colors.primary : theme.colors.onSurfaceVariant} 
+                      />
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
+            </Surface>
+          </View>
         </ScrollView>
 
         {/* Submit Button */}
@@ -442,18 +563,13 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+    alignItems: 'center',
+  },
   content: {
-    padding: 20,
-  },
-  centerContent: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notFound: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
     padding: 20,
   },
   previewCard: {
@@ -472,6 +588,17 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  centerContent: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  notFound: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
   iconGridCard: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -487,55 +614,62 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  input: {
-    marginBottom: 12,
-  },
   voteTypeCard: {
     borderRadius: 16,
     overflow: 'hidden',
   },
   voteTypeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   voteTypeIconContainer: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  nomineesHeader: {
-    marginBottom: 4,
-  },
-  nomineesList: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-    
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   nomineesCard: {
     borderRadius: 16,
     overflow: 'hidden',
   },
+  nomineesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  nomineesList: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   nomineeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  input: {
+    marginBottom: 16,
+    backgroundColor: 'transparent',
   },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 12,
     marginBottom: 24,
   },
   footer: {
-    padding: 16,
-    paddingTop: 16,
-  },
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  }
 });
+
+

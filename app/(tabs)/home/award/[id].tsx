@@ -33,6 +33,7 @@ import { MemberSelectMenu } from "../../../../components/ui/MemberSelectMenu";
 import { useSnackbar } from "../../../../components/ui/SnackbarContext";
 import { defaultAwardIcon, getIconComponent, IconName } from "../../../../constants/icons";
 import { useAuth, useGroup } from "../../../../hooks";
+import { supabase } from "../../../../lib/supabase";
 import { awardsService } from "../../../../services";
 import { AwardWithNominees } from "../../../../types/database";
 
@@ -134,6 +135,66 @@ export default function AwardDetailScreen() {
       fetchAward();
     }, [fetchAward])
   );
+
+  // Realtime Subscriptions
+  useEffect(() => {
+    if (!id || !user) return;
+
+    const channel = supabase
+      .channel(`award_room:${id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'awards', filter: `id=eq.${id}` },
+        (payload: any) => {
+          setAward(current => current ? { ...current, ...payload.new } : null);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'nominees', filter: `award_id=eq.${id}` },
+        (payload: any) => {
+          setAward(current => {
+             if (!current) return null;
+             const updatedNominees = current.nominees.map(n => 
+               n.id === payload.new.id ? { ...n, ...payload.new } : n
+             );
+             // Re-sort by created_at to keep order stable
+             return { ...current, nominees: updatedNominees.sort((a, b) => a.created_at.localeCompare(b.created_at)) };
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'nominees', filter: `award_id=eq.${id}` },
+        (payload: any) => {
+           // For INSERT or DELETE, best to reload to get profile data or remove correctly
+           if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+             fetchAward();
+           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'votes', filter: `award_id=eq.${id}` },
+        (payload: any) => {
+           // Always refresh award data to update total vote counts
+           fetchAward();
+
+           // Check if it affects me (local state optimization)
+           if (payload.new && (payload.new as any).voter_id === user.id) {
+              setMyVote((payload.new as any).nominee_id);
+           } else if (payload.eventType === 'DELETE') {
+              // If a deletion happens, we re-verify our own vote just in case
+              awardsService.getMyVote(id).then(setMyVote);
+           }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, user, fetchAward]);
 
   const [showManageNomineesModal, setShowManageNomineesModal] = useState(false);
   const [selectedNomineeIds, setSelectedNomineeIds] = useState<string[]>([]);
@@ -247,9 +308,30 @@ export default function AwardDetailScreen() {
     
     try {
       setActionLoading(true);
+
+      // If clicking the same nominee, check if we can remove the vote
+      if (myVote === nomineeId) {
+        if (award.voting_settings?.allow_vote_change) {
+          await awardsService.removeVote(award.id);
+          setMyVote(null);
+          // Small delay to allow DB triggers to finish
+          setTimeout(() => fetchAward(), 500);
+          showSnackbar("Voto retirado", "success");
+        }
+        return;
+      }
+
+      // Casting a new vote (or changing to a new person)
       await awardsService.vote(award.id, nomineeId);
       setMyVote(nomineeId);
-      showSnackbar("Tu voto ha sido registrado", "success");
+      // Small delay to allow DB triggers to finish
+      setTimeout(() => fetchAward(), 500);
+      
+      if (myVote) {
+        showSnackbar("Tu voto ha sido cambiado", "success");
+      } else {
+        showSnackbar("Tu voto ha sido registrado", "success");
+      }
     } catch (error: any) {
       showSnackbar(error.message || "No se pudo registrar el voto", "error");
     } finally {
@@ -554,6 +636,19 @@ export default function AwardDetailScreen() {
               </View>
             )}
 
+            {/* Total Votes Count */}
+            {['voting', 'completed'].includes(award.status) && (() => {
+              const totalVotes = award.nominees.reduce((acc, curr) => acc + (curr.vote_count || 0), 0);
+              return (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: award.status === 'voting' && award.voting_end_at ? 4 : 12 }}>
+                  <Ionicons name="stats-chart" size={14} color={theme.colors.onSurfaceVariant} />
+                  <Text variant="labelMedium" style={{ color: theme.colors.onSurfaceVariant, marginLeft: 6 }}>
+                    {totalVotes} {totalVotes === 1 ? 'voto total' : 'votos totales'}
+                  </Text>
+                </View>
+              );
+            })()}
+
             {award.status === 'completed' && (
               <View style={[styles.completedBanner, { 
                 backgroundColor: !award.winner_id ? theme.colors.surfaceVariant : (award.is_revealed ? '#22C55E20' : theme.colors.primaryContainer) 
@@ -652,34 +747,51 @@ export default function AwardDetailScreen() {
                     </View>
                     
                     {/* Vote Button */}
-                    {award.status === 'voting' && (
-                      <TouchableOpacity
-                        style={[
-                          styles.voteButton,
-                          { 
-                            backgroundColor: myVote === nominee.id ? theme.colors.primary : 'transparent',
-                            borderColor: myVote === nominee.id ? theme.colors.primary : theme.colors.outline,
-                          }
-                        ]}
-                        disabled={!!myVote || actionLoading}
-                        onPress={() => handleVote(nominee.id)}
-                      >
-                       <Ionicons 
-                          name={myVote === nominee.id ? "checkmark" : "heart-outline"} 
-                          size={16} 
-                          color={myVote === nominee.id ? theme.colors.onPrimary : theme.colors.outline} 
-                        />
-                        <Text 
-                          style={{ 
-                            marginLeft: 6, 
-                            fontWeight: '600',
-                            color: myVote === nominee.id ? theme.colors.onPrimary : theme.colors.outline,
-                          }}
+                    {award.status === 'voting' && (() => {
+                      const isCurrentUserNominee = award.vote_type === 'person' && award.nominees.some(n => n.user_id === user?.id);
+                      const isSelf = nominee.user_id === user?.id;
+                      
+                      const isVoteDisabled = 
+                        actionLoading || 
+                        (!!myVote && !award.voting_settings?.allow_vote_change) ||
+                        (isCurrentUserNominee && !award.voting_settings?.nominees_can_vote) ||
+                        (isCurrentUserNominee && isSelf && !award.voting_settings?.allow_self_vote);
+
+                      // Style for disabled state (e.g. grayed out if strict restriction)
+                      // If I voted, I want only the OTHER buttons to look disabled (if change is not allowed)
+                      // The selected button should remain opaque (primary color)
+                      const isDisabledStyle = isVoteDisabled && myVote !== nominee.id ? { opacity: 0.5 } : {};
+
+                      return (
+                        <TouchableOpacity
+                          style={[
+                            styles.voteButton,
+                            { 
+                              backgroundColor: myVote === nominee.id ? theme.colors.primary : 'transparent',
+                              borderColor: myVote === nominee.id ? theme.colors.primary : theme.colors.outline,
+                            },
+                            isDisabledStyle
+                          ]}
+                          disabled={isVoteDisabled}
+                          onPress={() => handleVote(nominee.id)}
                         >
-                          {myVote === nominee.id ? "Votado" : "Votar"}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
+                         <Ionicons 
+                            name={myVote === nominee.id ? "checkmark" : "heart-outline"} 
+                            size={16} 
+                            color={myVote === nominee.id ? theme.colors.onPrimary : theme.colors.outline} 
+                          />
+                          <Text 
+                            style={{ 
+                              marginLeft: 6, 
+                              fontWeight: '600',
+                              color: myVote === nominee.id ? theme.colors.onPrimary : theme.colors.outline,
+                            }}
+                          >
+                            {myVote === nominee.id ? "Votado" : "Votar"}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })()}
 
                     {/* Persistent Vote Indicator (when not voting) */}
                     {award.status !== 'voting' && myVote === nominee.id && (
@@ -792,7 +904,8 @@ export default function AwardDetailScreen() {
               ]} 
               elevation={1}
             >
-              {/* Edit Award Button - Always visible for admins */}
+              {/* Edit Award Button - Only visible before voting starts */}
+              {['draft', 'nominations'].includes(award.status) ? (
               <TouchableOpacity 
                 style={[styles.adminButton, { backgroundColor: theme.colors.surfaceVariant }]}
                 onPress={() => router.push(`/home/award/edit?id=${id}&groupId=${groupId}`)}
@@ -808,6 +921,7 @@ export default function AwardDetailScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={theme.colors.onSurfaceVariant} />
               </TouchableOpacity>
+              ) : null}
 
               {award.status === 'draft' && (
                 <>
